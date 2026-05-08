@@ -818,6 +818,20 @@
       <div class="inv-list" id="inv-list"></div>
     </div>
 
+    <div class="card" style="padding:18px 20px; margin-top:16px">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:8px">
+        <div>
+          <h3 style="margin:0; font-size:14px; font-weight:600">Abonados únicos por partido</h3>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:2px">Cuántos abonados únicos intentaron vender y cuántos lo lograron · total y % de éxito al final</div>
+        </div>
+        <div class="inv-legend">
+          <span><span class="dot sold"></span>Vendieron</span>
+          <span><span class="dot exp"></span>No vendieron</span>
+        </div>
+      </div>
+      <div class="inv-list" id="abonados-list"></div>
+    </div>
+
     <div class="card chart-card" style="margin-top:20px">
       <div class="chart-header">
         <h2 style="margin:0">Ingresos por partido (mercado secundario)</h2>
@@ -1944,9 +1958,63 @@ function renderMSHeatmap() {
   grid.innerHTML = html;
 }
 
+function renderMSAbonadosChart() {
+  const el = document.getElementById("abonados-list");
+  if (!el) return;
+
+  const abonados = state.data.abonados;
+  const fe = state.filters.msEstatus;
+  const byRival = new Map();
+
+  for (const r of (state.data.reventas || [])) {
+    const a = abonados[r.a];
+    if (!a || !inScope(a, "main")) continue;
+    if (fe === "vendido"  && !r.vendio) continue;
+    if (fe === "expirado" &&  r.vendio) continue;
+    const cur = byRival.get(r.rival) || { vendieron: 0, noVendieron: 0 };
+    if (r.vendio) cur.vendieron++;
+    else          cur.noVendieron++;
+    byRival.set(r.rival, cur);
+  }
+
+  const rows = Array.from(byRival.entries())
+    .map(([rival, v]) => ({ rival, ...v, total: v.vendieron + v.noVendieron }))
+    .sort((a, b) => b.total - a.total);
+
+  const scale = rows.reduce((m, r) => Math.max(m, r.total), 0) || 1;
+  const OUTSIDE_THRESHOLD = 7;
+
+  el.innerHTML = rows.map(r => {
+    const vendW = (r.vendieron   / scale) * 100;
+    const noW   = (r.noVendieron / scale) * 100;
+    const vendInside = vendW >= OUTSIDE_THRESHOLD;
+    const noInside   = noW   >= OUTSIDE_THRESHOLD;
+    const vendStr = r.vendieron   ? r.vendieron.toLocaleString("es-MX")   : "";
+    const noStr   = r.noVendieron ? r.noVendieron.toLocaleString("es-MX") : "";
+    const extras = [];
+    if (r.vendieron   && !vendInside) extras.push(`<span class="x-sold">${vendStr}</span>`);
+    if (r.noVendieron && !noInside)   extras.push(`<span class="x-exp">${noStr}</span>`);
+    const extHTML = extras.length ? `<div class="inv-ext">${extras.join("")}</div>` : "";
+    const pct = r.total > 0 ? (r.vendieron / r.total * 100).toFixed(0) + "% éxito" : "—";
+    return `
+      <div class="inv-row">
+        <div class="name">${escapeHTML(r.rival)}</div>
+        <div class="inv-bar-wrap">
+          <div class="inv-bar">
+            <div class="seg sold ${vendInside ? "" : "empty-lbl"}" style="width:${vendW.toFixed(2)}%">${vendInside ? vendStr : ""}</div>
+            <div class="seg exp  ${noInside   ? "" : "empty-lbl"}" style="width:${noW.toFixed(2)}%">${noInside   ? noStr   : ""}</div>
+          </div>
+          ${extHTML}
+        </div>
+        <div class="total">${r.total.toLocaleString("es-MX")} <span style="font-size:11px;color:var(--text-muted);margin-left:4px">${pct}</span></div>
+      </div>`;
+  }).join("");
+}
+
 function renderMS() {
   if (!$("#tabla-ms")) return;
   renderMSInvList();
+  renderMSAbonadosChart();
   renderMSIngresos();
   renderMSZonas();
   renderMSHeatmap();
