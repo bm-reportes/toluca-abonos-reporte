@@ -1560,8 +1560,8 @@ function msCountsByRival(scope) {
     if (fe === "vendido"  && !r.vendio) continue;
     if (fe === "expirado" &&  r.vendio) continue;
     const cur = byRival.get(r.rival) || { total: 0, vendidos: 0, expirados: 0 };
-    cur.total    += r.listings;
-    if (r.vendio) cur.vendidos++;
+    cur.total     += r.listings;
+    cur.vendidos  += r.vendidos || 0;
     cur.expirados += r.expirados;
     byRival.set(r.rival, cur);
   }
@@ -1750,8 +1750,9 @@ function computeMSZonas(scope) {
     const zona = a.zona || "(sin zona)";
     let o = agg.get(zona);
     if (!o) { o = { zona, total: 0, vendidos: 0, expirados: 0, preciosV: [], preciosE: [] }; agg.set(zona, o); }
-    o.total += r.listings;
-    if (r.vendio)  { o.vendidos++;  if (typeof r.precio         === "number") o.preciosV.push(r.precio); }
+    o.total     += r.listings;
+    o.vendidos  += r.vendidos || 0;
+    if (r.vendio && typeof r.precio === "number") o.preciosV.push(r.precio);
     o.expirados += r.expirados;
     if (!r.vendio && typeof r.precio_listado === "number") o.preciosE.push(r.precio_listado);
   }
@@ -1881,7 +1882,7 @@ function renderMSHeatmap() {
     let o = agg.get(r.rival);
     if (!o) { o = { rival: r.rival, listings: 0, vendidos: 0, expirados: 0 }; agg.set(r.rival, o); }
     o.listings   += r.listings;
-    if (r.vendio) o.vendidos++;
+    o.vendidos   += r.vendidos || 0;
     o.expirados  += r.expirados;
   }
 

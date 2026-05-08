@@ -353,6 +353,7 @@ def build_reventas(abonados):
                     "rival":          rival,
                     "listings":       0,
                     "expirados":      0,
+                    "vendidos":       0,
                     "vendio":         False,
                     "fecha":          None,
                     "ultimo":         None,
@@ -362,7 +363,8 @@ def build_reventas(abonados):
             e = agg[key]
             e["listings"] += 1
             if es_vendido:
-                e["vendio"] = True
+                e["vendio"]   = True
+                e["vendidos"] += 1
                 if precio is not None:
                     e["precio"] = precio
             elif es_expirado:
