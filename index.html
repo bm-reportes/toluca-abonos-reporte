@@ -139,6 +139,22 @@
   .inv-row + .inv-row { border-top: 1px solid var(--border); }
   .inv-row .name { font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .inv-row .total { text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 700; }
+  .inv-row-clickable { cursor: pointer; transition: background .12s; }
+  .inv-row-clickable:hover { background: rgba(255,255,255,.04); }
+  .inv-expand-ico { font-size: 9px; opacity: .45; margin-left: 5px; display: inline-block; transition: transform .15s; }
+  .inv-detail {
+    background: rgba(0,0,0,.25);
+    border-left: 3px solid var(--accent);
+    margin: 0 0 2px 0;
+    overflow: hidden;
+  }
+  .inv-detail table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .inv-detail thead th { padding: 7px 12px; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--border); text-align: left; }
+  .inv-detail thead th.r { text-align: right; }
+  .inv-detail tbody td { padding: 6px 12px; border-bottom: 1px solid rgba(255,255,255,.04); font-size: 12px; vertical-align: middle; }
+  .inv-detail tbody td.r { text-align: right; font-variant-numeric: tabular-nums; }
+  .inv-detail tbody tr:last-child td { border-bottom: none; }
+  .inv-detail tbody tr:hover td { background: rgba(255,255,255,.03); }
 
   .inv-bar-wrap { display: flex; align-items: center; gap: 8px; min-width: 0; }
   .inv-bar {
@@ -587,9 +603,6 @@
         <span class="ico">▦</span> Resumen
       </a>
       <a class="nav-item" data-page="full">
-        <span class="ico">★</span> Digital FULL
-      </a>
-      <a class="nav-item" data-page="cortesia">
         <span class="ico">🎁</span> Abonos cortesía
       </a>
     </div>
@@ -667,8 +680,10 @@
             <th class="sortable" data-key="rival">Rival</th>
             <th class="num sortable" data-key="elegibles" title="Abonados que tenían vigencia al momento del partido. Excluye los abonos emitidos posteriormente.">Elegibles</th>
             <th class="num sortable" data-key="asistencias" title="Abonados cuyo acceso fue registrado, incluyendo compradores de MS que entraron con el código del abono.">Asistencia</th>
-            <th class="num sortable" data-key="reventa" title="Abonados únicos que vendieron al menos un ticket en mercado secundario (independientemente de si el comprador asistió).">Reventa</th>
-            <th class="num sortable" data-key="vaciosReales" title="Asientos que nadie ocupó y nadie vendió. Incluye quienes intentaron vender pero ningún listing se concretó.">Vacíos</th>
+            <th class="num sortable" data-key="reventa" title="Abonados únicos que vendieron al menos un ticket en mercado secundario.">Reventa</th>
+            <th class="num sortable" data-key="listaron" title="Abonados que intentaron vender en MS (vendieron + los que no lograron vender).">Intentaron</th>
+            <th class="num sortable" data-key="vaciosReales" title="Abonados que no están registrados en asistencia y tampoco vendieron ningún boleto en mercado secundario.">Vacíos</th>
+            <th class="num sortable" data-key="pctUsaMS" title="Intentaron / (Elegibles − Asistencia) — qué porcentaje de los que no asistieron conocen o usan el beneficio de MS.">% usa MS</th>
             <th class="num sortable" data-key="pctUso" title="Asistencia / Elegibles">% uso</th>
           </tr>
         </thead>
@@ -679,22 +694,6 @@
       </div>
     </div>
 
-    <div class="card chart-card" style="margin-top:20px">
-      <div class="chart-header" style="flex-direction:column; align-items:flex-start; gap:10px">
-        <div style="display:flex; align-items:center; justify-content:space-between; width:100%; flex-wrap:wrap; gap:10px">
-          <div style="display:flex; align-items:center; gap:6px">
-            <h2 style="margin:0">Composición por partido</h2>
-            <span class="info-icon" title="Apilado por partido — verde: Asistencia directa · azul: Vendido en reventa (asiento ocupado por terceros) · ámbar: Listado en MS pero no vendido (intentaron sin éxito) · rojo: Vacío sin listar. El total encima de cada barra es el total visible (cambia si ocultas series en la leyenda).">i</span>
-          </div>
-          <div class="pill-tabs" id="chart-sort-tabs">
-            <button data-sort="cron" class="active">Cronológico</button>
-            <button data-sort="desc">Mayor uso</button>
-            <button data-sort="asc">Menor uso</button>
-          </div>
-        </div>
-      </div>
-      <div class="chart-box" style="height:440px"><canvas id="chart-nousados"></canvas></div>
-    </div>
 
     <div class="card zonas-card" style="margin-top:20px; padding:18px 20px">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px">
@@ -806,24 +805,12 @@
       <div class="kpi"><div class="label">Tasa de éxito <span class="info-icon" title="% de abonados que intentaron vender y lograron vender al menos uno.">i</span></div><div class="value" id="kpi-ms-tasa-exito">—</div><div class="sub" id="kpi-ms-tasa-sub">—</div></div>
       <div class="kpi"><div class="label">Total de listings</div><div class="value" id="kpi-ms-total">—</div></div>
       <div class="kpi"><div class="label">Ingresos totales</div><div class="value" id="kpi-ms-ingresos">—</div></div>
-      <div class="kpi"><div class="label">Precio promedio</div><div class="value" id="kpi-ms-precio-prom">—</div></div>
     </div>
 
     <div class="card" style="padding:18px 20px">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px">
-        <h3 style="margin:0; font-size:14px; font-weight:600">Resolución de inventario por partido</h3>
-        <div class="inv-legend">
-          <span><span class="dot sold"></span>Vendidos</span>
-          <span><span class="dot exp"></span>Expirados</span>
-        </div>
-      </div>
-      <div class="inv-list" id="inv-list"></div>
-    </div>
-
-    <div class="card" style="padding:18px 20px; margin-top:16px">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:8px">
         <div>
-          <h3 style="margin:0; font-size:14px; font-weight:600">Abonados únicos por partido</h3>
+          <h3 style="margin:0; font-size:14px; font-weight:600">Abonos únicos por partido</h3>
           <div style="font-size:12px; color:var(--text-muted); margin-top:2px">Cuántos abonados únicos intentaron vender y cuántos lo lograron · total y % de éxito al final</div>
         </div>
         <div class="inv-legend">
@@ -832,6 +819,17 @@
         </div>
       </div>
       <div class="inv-list" id="abonados-list"></div>
+    </div>
+
+    <div class="card" style="padding:18px 20px; margin-top:16px">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px">
+        <h3 style="margin:0; font-size:14px; font-weight:600">Listing por partido</h3>
+        <div class="inv-legend">
+          <span><span class="dot sold"></span>Vendidos</span>
+          <span><span class="dot exp"></span>Expirados</span>
+        </div>
+      </div>
+      <div class="inv-list" id="inv-list"></div>
     </div>
 
     <div class="card chart-card" style="margin-top:20px">
@@ -901,7 +899,7 @@
   <section class="page" id="page-full">
     <div class="page-header">
       <div>
-        <h1>Digital FULL</h1>
+        <h1>Abonos cortesía</h1>
         <div class="subtitle">Abonados del paquete <b>DIABLO ABONO AP25 - CL26 DIGITAL FULL</b> (separados del resto)</div>
       </div>
     </div>
@@ -971,83 +969,6 @@
         <tbody></tbody>
       </table>
       <div class="empty" id="full-empty" style="display:none">No hay abonados FULL que coincidan.</div>
-    </div>
-  </section>
-
-  <!-- PÁGINA: ABONOS CORTESÍA -->
-  <section class="page" id="page-cortesia">
-    <div class="page-header">
-      <div>
-        <h1>Abonos cortesía</h1>
-        <div class="subtitle">Abonados con tipo <b>CORTESÍA</b> en la orden de emisión</div>
-      </div>
-    </div>
-
-    <div class="kpi-grid" style="margin-bottom:20px">
-      <div class="kpi"><div class="label">Abonados cortesía</div><div class="value" id="kpi-cortesia-abonados">—</div></div>
-      <div class="kpi"><div class="label">Partidos</div><div class="value" id="kpi-cortesia-partidos">—</div></div>
-    </div>
-
-    <div class="card chart-card" style="margin-bottom:20px">
-      <div class="chart-header">
-        <div style="display:flex; align-items:center; gap:6px">
-          <h2 style="margin:0">Composición por partido (Cortesía)</h2>
-          <span class="info-icon" title="Apilado: Asistentes (verde) y Asientos vacíos (rojo). Click en una barra para filtrar la tabla a quienes faltaron a ese partido.">i</span>
-        </div>
-        <button class="reset" id="f-cortesia-partido-clear" style="display:none">Limpiar selección</button>
-      </div>
-      <div class="chart-box" style="height:440px"><canvas id="chart-cortesia-nousados"></canvas></div>
-    </div>
-
-    <div class="card" style="padding:18px 20px; margin-bottom:16px">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px">
-        <div>
-          <h3 style="margin:0; font-size:14px; font-weight:600">Frecuencia de asistencia (Cortesía)</h3>
-          <div style="font-size:12px; color: var(--text-muted); margin-top:2px">
-            Cuántos abonados cortesía asistieron a N partidos · <span style="color: var(--accent)">Click en una barra para filtrar la tabla</span>
-          </div>
-        </div>
-        <button class="reset" id="f-cortesia-bucket-clear" style="display:none">Limpiar selección</button>
-      </div>
-      <div class="chart-box" style="height:280px"><canvas id="chart-cortesia-fid"></canvas></div>
-    </div>
-
-    <div id="cortesia-filter-banner" style="display:none; padding:10px 14px; background: var(--accent-soft); border:1px solid var(--accent); border-radius: 8px; margin-bottom:12px; font-size:13px; color: var(--text); display:flex; align-items:center; justify-content:space-between; gap:10px"></div>
-
-    <div class="filters" style="margin-bottom:12px">
-      <div class="field">
-        <label for="f-cortesia-limit">Mostrar</label>
-        <select id="f-cortesia-limit">
-          <option value="50">Top 50</option>
-          <option value="100">Top 100</option>
-          <option value="250">Top 250</option>
-          <option value="0">Todos</option>
-        </select>
-      </div>
-      <div class="field" style="flex:1; min-width:220px">
-        <label for="f-cortesia-search">Buscar (nombre, correo, ID)</label>
-        <input id="f-cortesia-search" type="search" placeholder="Ej. López, @gmail.com…" />
-      </div>
-    </div>
-
-    <div class="card table-wrap">
-      <table id="tabla-cortesia">
-        <thead>
-          <tr>
-            <th class="sortable" data-key="nombre">Nombre</th>
-            <th class="sortable" data-key="orden">Orden</th>
-            <th class="sortable" data-key="barcode">Código barras</th>
-            <th class="sortable" data-key="asiento">Asiento</th>
-            <th class="sortable" data-key="zona">Zona</th>
-            <th class="sortable" data-key="contacto">Contacto</th>
-            <th class="num sortable" data-key="elegibles">Elegibles</th>
-            <th class="num sortable" data-key="asistidos">Asistidos</th>
-            <th class="num sortable" data-key="pct">% asistencia</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-      <div class="empty" id="cortesia-empty" style="display:none">No hay abonados cortesía que coincidan.</div>
     </div>
   </section>
 
@@ -1145,10 +1066,6 @@ const state = {
     fullSearch: "",
     fullBucket: null,
     fullPartidoMiss: null,
-    cortesiaLimit: 50,
-    cortesiaSearch: "",
-    cortesiaBucket: null,
-    cortesiaPartidoMiss: null,
     chartSort: "cron",  // "cron" | "desc" | "asc"  (gráfica abonos no usados)
     heatmapSort: "cron",  // "cron" | "listings" | "rechazo" (heatmap MS por partido)
     ausentesPartido: null,  // partido_id si se filtra el panel "Ausentes por zona"
@@ -1161,28 +1078,27 @@ const state = {
   sortMS:       { key: "total",  dir: "desc" },
   sortMSZonas:  { key: "total",  dir: "desc" },
   sortFull:     { key: "pct",    dir: "desc" },
-  sortCortesia: { key: "pct",    dir: "desc" },
   chart: null,          // gráfica abonos no usados
   chartMS: null,        // gráfica MS por partido
   chartMSIng: null,     // gráfica MS ingresos por partido
   chartFid: null,       // histograma de fidelidad (Ranking)
   chartFull: null,
   chartFullFid: null,
-  chartCortesia: null,
-  chartCortesiaFid: null,
 };
 
 // Filtro por ámbito de evento. Devuelve true si el abonado pertenece al scope actual.
 function inScope(a, scope) {
   scope = scope || state.scope || "main";
-  if (scope === "full")     return !!a.esFull;
-  if (scope === "cortesia") return !!a.esCortesia;
+  if (scope === "full") return !!a.esFull;
   return !a.esFull;
 }
 
 // ---------- utilidades -------------------------------------------------
 const $ = (sel) => document.querySelector(sel);
 const fmtPct = (n) => (isFinite(n) ? (n * 100).toFixed(1) + "%" : "—");
+const semaforo      = (n) => n >= 0.80 ? null : n >= 0.65 ? "#f59e0b" : "#ef4444";
+const semaforoExito = (n) => n >= 0.70 ? "#22c55e" : n >= 0.50 ? "#f59e0b" : "#ef4444";
+const badgePct = (n, fn) => { const c = fn(n); return c ? `<span style="display:inline-block;padding:2px 8px;border-radius:12px;background:${c};color:#fff;font-weight:700;font-size:12px">${fmtPct(n)}</span>` : `<span style="font-weight:700;font-size:12px">${fmtPct(n)}</span>`; };
 const fmtDate = (iso) => {
   if (!iso) return "—";
   const d = new Date(iso + "T00:00:00");
@@ -1292,12 +1208,10 @@ function wireFilters() {
       if (page === "ranking")     renderHistogramaFidelidad();
       if (page === "ms-partidos") { renderMSInvList(); renderMSIngresos(); }
       if (page === "full")        renderFull();
-      if (page === "cortesia")    renderCortesia();
     });
   });
 
   wireFullFilters();
-  wireCortesiaFilters();
 
   // Tabs de orden para la gráfica "Abonos no usados por partido"
   document.querySelectorAll("#chart-sort-tabs button").forEach(btn => {
@@ -1399,7 +1313,6 @@ function reventasByPartido(scope) {
     if (!pid) continue;
     out.get(pid).set(r.a, {
       vendido:   r.vendio,
-      vendidos:  r.vendidos || 0,
       expirado:  !r.vendio && r.expirados > 0,
       disponible: false,
     });
@@ -1440,11 +1353,13 @@ function computePartidoStats(scope) {
     }
     const ausencias    = elegibles - asistencias;
     const vaciosReales = listoSinVender + vacioSinListar;
-    // reventa = total de boletos vendidos en MS (sum de vendidos, no abonados únicos)
+    // reventa = abonados únicos que vendieron en MS
     let reventaTotal = 0;
     for (const [, r] of partidoReventa) {
-      reventaTotal += r.vendidos || 0;
+      if (r.vendido) reventaTotal++;
     }
+    const listaron  = partidoReventa.size;
+    const pctExito  = listaron > 0 ? reventaTotal / listaron : 0;
 
     return {
       partido: p,
@@ -1452,6 +1367,8 @@ function computePartidoStats(scope) {
       asistencias,
       ausencias,
       reventa: reventaTotal,
+      listaron,
+      pctExito,
       reventaSinAsist,   // para el gráfico apilado (categoría exclusiva)
       listoSinVender,
       vacioSinListar,
@@ -1537,7 +1454,6 @@ function render() {
   renderRanking();
   renderMS();
   renderFull();
-  renderCortesia();
 }
 
 // Ausentes (no asistieron físicamente) agrupados por zona del estadio.
@@ -2058,17 +1974,35 @@ function renderMSAbonadosChart() {
 
   const abonados = state.data.abonados;
   const fe = state.filters.msEstatus;
-  const byRival = new Map();
+  const byRival     = new Map(); // rival -> { vendieron, noVendieron }
+  const detailByRival = new Map(); // rival -> [ detalle por abonado ]
 
   for (const r of (state.data.reventas || [])) {
     const a = abonados[r.a];
     if (!a || !inScope(a, "main")) continue;
     if (fe === "vendido"  && !r.vendio) continue;
     if (fe === "expirado" &&  r.vendio) continue;
+
     const cur = byRival.get(r.rival) || { vendieron: 0, noVendieron: 0 };
-    if (r.vendio) cur.vendieron++;
-    else          cur.noVendieron++;
+    if (r.vendio) cur.vendieron++; else cur.noVendieron++;
     byRival.set(r.rival, cur);
+
+    if (!detailByRival.has(r.rival)) detailByRival.set(r.rival, []);
+    detailByRival.get(r.rival).push({
+      nombre:    a.nombre   || "—",
+      zona:      a.zona     || "—",
+      asiento:   a.asiento  || "—",
+      listings:  r.listings  || 0,
+      vendidos:  r.vendidos  || 0,
+      expirados: r.expirados || 0,
+      vendio:    r.vendio,
+      precio:    r.precio,
+    });
+  }
+
+  // vendieron primero, luego por listings desc
+  for (const [, det] of detailByRival) {
+    det.sort((a, b) => (b.vendio ? 1 : 0) - (a.vendio ? 1 : 0) || b.listings - a.listings);
   }
 
   const rows = Array.from(byRival.entries())
@@ -2078,21 +2012,22 @@ function renderMSAbonadosChart() {
   const scale = rows.reduce((m, r) => Math.max(m, r.total), 0) || 1;
   const OUTSIDE_THRESHOLD = 7;
 
-  el.innerHTML = rows.map(r => {
+  el.innerHTML = rows.map((r, idx) => {
     const vendW = (r.vendieron   / scale) * 100;
     const noW   = (r.noVendieron / scale) * 100;
     const vendInside = vendW >= OUTSIDE_THRESHOLD;
     const noInside   = noW   >= OUTSIDE_THRESHOLD;
-    const vendStr = r.vendieron   ? r.vendieron.toLocaleString("es-MX")   : "";
+    const vendStr = r.vendieron   ? r.vendieron.toLocaleString("es-MX") : "";
     const noStr   = r.noVendieron ? r.noVendieron.toLocaleString("es-MX") : "";
     const extras = [];
     if (r.vendieron   && !vendInside) extras.push(`<span class="x-sold">${vendStr}</span>`);
     if (r.noVendieron && !noInside)   extras.push(`<span class="x-exp">${noStr}</span>`);
-    const extHTML = extras.length ? `<div class="inv-ext">${extras.join("")}</div>` : "";
-    const pct = r.total > 0 ? (r.vendieron / r.total * 100).toFixed(0) + "% éxito" : "—";
+    const extHTML   = extras.length ? `<div class="inv-ext">${extras.join("")}</div>` : "";
+    const exitoPct  = r.total > 0 ? r.vendieron / r.total : 0;
+    const exitoBadge = r.total > 0 ? `<span style="display:inline-block;padding:1px 7px;border-radius:10px;background:${semaforoExito(exitoPct)};color:#fff;font-weight:700;font-size:11px;margin-left:6px">${(exitoPct*100).toFixed(0)}% éxito</span>` : "";
     return `
-      <div class="inv-row">
-        <div class="name">${escapeHTML(r.rival)}</div>
+      <div class="inv-row inv-row-clickable" data-idx="${idx}">
+        <div class="name">${escapeHTML(r.rival)}<span class="inv-expand-ico">▶</span></div>
         <div class="inv-bar-wrap">
           <div class="inv-bar">
             <div class="seg sold ${vendInside ? "" : "empty-lbl"}" style="width:${vendW.toFixed(2)}%">${vendInside ? vendStr : ""}</div>
@@ -2100,9 +2035,58 @@ function renderMSAbonadosChart() {
           </div>
           ${extHTML}
         </div>
-        <div class="total">${r.total.toLocaleString("es-MX")} <span style="font-size:11px;color:var(--text-muted);margin-left:4px">${pct}</span></div>
-      </div>`;
+        <div class="total">${r.total.toLocaleString("es-MX")}${exitoBadge}</div>
+      </div>
+      <div class="inv-detail" id="msdetail-${idx}" style="display:none"></div>`;
   }).join("");
+
+  el.querySelectorAll(".inv-row-clickable").forEach(row => {
+    row.addEventListener("click", () => {
+      const idx      = parseInt(row.dataset.idx);
+      const detailEl = document.getElementById(`msdetail-${idx}`);
+      const ico      = row.querySelector(".inv-expand-ico");
+      if (!detailEl) return;
+      const isOpen = detailEl.style.display !== "none";
+      detailEl.style.display = isOpen ? "none" : "block";
+      if (ico) ico.textContent = isOpen ? "▶" : "▼";
+      if (!isOpen) detailEl.innerHTML = buildMSAbonadoDetail(detailByRival.get(rows[idx].rival) || []);
+    });
+  });
+}
+
+function filterMSDetail(btn, val) {
+  const wrap = btn.closest(".inv-detail");
+  if (!wrap) return;
+  wrap.querySelectorAll(".ms-detail-filter-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  wrap.querySelectorAll("tbody tr[data-v]").forEach(tr => {
+    tr.style.display = (val === "all" || tr.dataset.v === val) ? "" : "none";
+  });
+}
+
+function buildMSAbonadoDetail(rows) {
+  if (!rows.length) return `<p style="padding:12px 16px;color:var(--text-muted)">Sin datos.</p>`;
+  const tbody = rows.map(r => `
+    <tr data-v="${r.vendio ? '1' : '0'}">
+      <td>${escapeHTML(r.nombre)}</td>
+      <td class="r muted">${escapeHTML(r.zona)}</td>
+      <td class="r muted">${escapeHTML(r.asiento)}</td>
+      <td class="r">${r.listings}</td>
+      <td class="r">${r.vendio ? '<span style="color:#22c55e;font-weight:600">Vendió</span>' : '<span style="color:var(--text-muted)">No vendió</span>'}</td>
+    </tr>`).join("");
+  return `
+    <div style="padding:8px 12px 4px; display:flex; gap:6px">
+      <button class="ms-detail-filter-btn active" onclick="filterMSDetail(this,'all')"   style="padding:3px 10px;border-radius:10px;border:1px solid var(--border);background:var(--accent);color:#fff;font-size:11px;cursor:pointer">Todos</button>
+      <button class="ms-detail-filter-btn"        onclick="filterMSDetail(this,'1')"    style="padding:3px 10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:#22c55e;font-size:11px;cursor:pointer">Vendió</button>
+      <button class="ms-detail-filter-btn"        onclick="filterMSDetail(this,'0')"    style="padding:3px 10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-size:11px;cursor:pointer">No vendió</button>
+    </div>
+    <table>
+      <thead><tr>
+        <th>Abonado</th><th class="r">Zona</th><th class="r">Asiento</th>
+        <th class="r">Listings</th><th class="r">Vendió</th>
+      </tr></thead>
+      <tbody>${tbody}</tbody>
+    </table>`;
 }
 
 function renderMS() {
@@ -2215,6 +2199,8 @@ function renderTablaPartidos(stats) {
     elegibles: s.elegibles,
     asistencias: s.asistencias,
     reventa: s.reventa,
+    listaron: s.listaron,
+    pctUsaMS: s.ausencias > 0 ? s.listaron / s.ausencias : 0,
     vaciosReales: s.vaciosReales,
     pctUso: s.pctUso,
   }));
@@ -2228,11 +2214,10 @@ function renderTablaPartidos(stats) {
       <td class="num">${s.elegibles.toLocaleString("es-MX")}</td>
       <td class="num">${s.asistencias.toLocaleString("es-MX")}</td>
       <td class="num" style="color:${s.reventa > 0 ? '#60a5fa' : 'var(--text-muted)'}">${s.reventa.toLocaleString("es-MX")}</td>
+      <td class="num" style="color:${s.listaron > 0 ? '#a78bfa' : 'var(--text-muted)'}">${s.listaron.toLocaleString("es-MX")}</td>
       <td class="num" style="color:${s.vaciosReales > 0 ? '#ef4444' : 'var(--text-muted)'}">${s.vaciosReales.toLocaleString("es-MX")}</td>
-      <td class="num">
-        ${fmtPct(s.pctUso)}
-        <span class="pct-bar"><span style="width:${Math.round((s.pctUso||0)*100)}%"></span></span>
-      </td>
+      <td class="num">${s.listaron > 0 ? badgePct(s.pctUsaMS, semaforo) : '<span style="color:var(--text-muted)">—</span>'}</td>
+      <td class="num">${badgePct(s.pctUso || 0, semaforo)}</td>
     `;
     tbody.appendChild(tr);
   }
@@ -2641,251 +2626,6 @@ function wireFullFilters() {
   $("#f-full-search")?.addEventListener("input",  e => { state.filters.fullSearch = e.target.value.trim().toLowerCase(); renderFull(); });
   document.querySelectorAll("#tabla-full th.sortable").forEach(th => {
     th.addEventListener("click", () => toggleSort(state.sortFull, th.dataset.key, renderFull));
-  });
-}
-
-function renderCortesia() {
-  if (!$("#tabla-cortesia")) return;
-
-  const cortesiaCount = state.data.abonados.reduce((s,a) => s + (a.esCortesia ? 1 : 0), 0);
-  const stats = computePartidoStats("cortesia");
-
-  $("#kpi-cortesia-abonados").textContent = cortesiaCount.toLocaleString("es-MX");
-  $("#kpi-cortesia-partidos").textContent = stats.length.toLocaleString("es-MX");
-
-  // Gráfica apilada por partido
-  const ctx1 = document.getElementById("chart-cortesia-nousados");
-  if (ctx1) {
-    const labels     = stats.map(s => s.partido.rival || "—");
-    const dataAsist  = stats.map(s => s.asistencias);
-    const dataVacios = stats.map(s => s.ausencias);
-    const pids       = stats.map(s => s.partido.id);
-    const totalsArr  = stats.map(s => s.elegibles);
-    const selPid     = state.filters.cortesiaPartidoMiss;
-
-    const dimVacios = dataVacios.map((_, i) => selPid == null ? "rgba(239, 68, 68, .85)" : (pids[i] === selPid ? "rgba(239, 68, 68, 1)" : "rgba(239, 68, 68, .25)"));
-    const dimAsist  = dataAsist.map((_, i)  => selPid == null ? "rgba(52, 211, 153, .9)"  : (pids[i] === selPid ? "rgba(52, 211, 153, 1)"  : "rgba(52, 211, 153, .25)"));
-
-    const totalsPlugin = {
-      id: "totalsCortesiaNou",
-      afterDatasetsDraw(chart) {
-        const { ctx: c, scales: { x, y } } = chart;
-        c.save();
-        c.font = "700 12px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-        c.textBaseline = "bottom"; c.textAlign = "center";
-        c.fillStyle = "#e7ebf3";
-        for (let i = 0; i < stats.length; i++) {
-          let visibleTotal = 0;
-          for (let dsi = 0; dsi < chart.data.datasets.length; dsi++) {
-            if (chart.isDatasetVisible(dsi)) visibleTotal += chart.data.datasets[dsi].data[i] || 0;
-          }
-          if (!visibleTotal) continue;
-          const px = x.getPixelForValue(i);
-          const py = y.getPixelForValue(visibleTotal) - 4;
-          c.fillText(visibleTotal.toLocaleString("es-MX"), px, py);
-        }
-        c.restore();
-      }
-    };
-
-    if (state.chartCortesia) state.chartCortesia.destroy();
-    state.chartCortesia = new Chart(ctx1, {
-      type: "bar",
-      data: {
-        labels,
-        datasets: [
-          { label: "Asistentes",      data: dataAsist,  backgroundColor: dimAsist,  stack: "c", borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 6, bottomRight: 6 } },
-          { label: "Asientos vacíos", data: dataVacios, backgroundColor: dimVacios, stack: "c", borderRadius: { topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0 } },
-        ]
-      },
-      plugins: [totalsPlugin],
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        layout: { padding: { top: 24 } },
-        onClick: (evt, elements) => {
-          if (!elements || !elements.length) return;
-          const pid = pids[elements[0].index];
-          state.filters.cortesiaPartidoMiss = (state.filters.cortesiaPartidoMiss === pid) ? null : pid;
-          renderCortesia();
-        },
-        onHover: (evt, elements) => { evt.native.target.style.cursor = elements.length ? "pointer" : "default"; },
-        plugins: {
-          legend: { display: true, position: "top", align: "end", labels: { color: "#e7ebf3", boxWidth: 10, boxHeight: 10, padding: 14, font: { size: 12 } } },
-          tooltip: {
-            callbacks: {
-              label: (c) => {
-                const v = c.parsed.y;
-                const t = totalsArr[c.dataIndex] || 1;
-                return `${c.dataset.label}: ${v.toLocaleString("es-MX")} (${(v/t*100).toFixed(1)}%)`;
-              },
-              footer: (items) => `Total elegibles: ${totalsArr[items[0].dataIndex].toLocaleString("es-MX")} · Click para ver faltantes`
-            }
-          }
-        },
-        scales: {
-          x: { stacked: true, ticks: { color: "#e7ebf3", font: { weight: "600" }, autoSkip: false, maxRotation: 45, minRotation: 45 }, grid: { display: false } },
-          y: { stacked: true, ticks: { color: "#9098a9", precision: 0 }, grid: { display: false }, beginAtZero: true }
-        }
-      }
-    });
-
-    const btn = document.getElementById("f-cortesia-partido-clear");
-    if (btn) {
-      btn.style.display = selPid == null ? "none" : "inline-block";
-      btn.onclick = () => { state.filters.cortesiaPartidoMiss = null; renderCortesia(); };
-    }
-  }
-
-  // Histograma de fidelidad (Cortesía)
-  const ctx2 = document.getElementById("chart-cortesia-fid");
-  if (ctx2) {
-    const partidos = partidosFiltrados();
-    const nPart = partidos.length;
-    const abonados = state.data.abonados;
-    const buckets = new Array(nPart + 1).fill(0);
-    for (let i = 0; i < abonados.length; i++) {
-      const a = abonados[i];
-      if (!a.esCortesia) continue;
-      let asistidos = 0;
-      for (const p of partidos) {
-        if (!isEligible(a, p.fecha)) continue;
-        const s = state.accesosSets.get(p.id);
-        if (s && s.has(i)) asistidos++;
-      }
-      buckets[asistidos]++;
-    }
-    const labels = buckets.map((_, i) => String(i));
-    const selBucket = state.filters.cortesiaBucket;
-    const bgBuckets = buckets.map((_, i) =>
-      selBucket == null ? "#ef4444" : (i === selBucket ? "#ef4444" : "#ef444455"));
-    const totalAll = buckets.reduce((s,v) => s+v, 0) || 1;
-
-    const totalsPlugin = {
-      id: "totalsCortesia",
-      afterDatasetsDraw(chart) {
-        const { ctx, scales: { x, y } } = chart;
-        ctx.save();
-        ctx.font = "600 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-        ctx.fillStyle = "#e7ebf3";
-        ctx.textAlign = "center"; ctx.textBaseline = "bottom";
-        for (let i = 0; i < buckets.length; i++) {
-          if (!buckets[i]) continue;
-          ctx.fillText(buckets[i].toLocaleString("es-MX"), x.getPixelForValue(i), y.getPixelForValue(buckets[i]) - 4);
-        }
-        ctx.restore();
-      }
-    };
-    if (state.chartCortesiaFid) state.chartCortesiaFid.destroy();
-    state.chartCortesiaFid = new Chart(ctx2, {
-      type: "bar",
-      data: { labels, datasets: [{ label: "Abonados cortesía", data: buckets, backgroundColor: bgBuckets, borderRadius: 4 }] },
-      plugins: [totalsPlugin],
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        layout: { padding: { top: 18 } },
-        onClick: (evt, elements) => {
-          if (!elements || !elements.length) return;
-          const idx = elements[0].index;
-          state.filters.cortesiaBucket = (state.filters.cortesiaBucket === idx) ? null : idx;
-          renderCortesia();
-        },
-        onHover: (evt, elements) => { evt.native.target.style.cursor = elements.length ? "pointer" : "default"; },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              title: (items) => `${items[0].label} partidos asistidos`,
-              label: (c) => `${c.parsed.y.toLocaleString("es-MX")} abonados (${(c.parsed.y/totalAll*100).toFixed(1)}%)`,
-              afterLabel: () => "Click para filtrar la tabla"
-            }
-          }
-        },
-        scales: {
-          x: { title: { display: true, text: "Partidos asistidos", color: "#8a92a5" }, ticks: { color: "#8a92a5" }, grid: { display: false } },
-          y: { ticks: { color: "#8a92a5", precision: 0 }, grid: { display: false }, beginAtZero: true }
-        }
-      }
-    });
-
-    const btn = document.getElementById("f-cortesia-bucket-clear");
-    if (btn) {
-      btn.style.display = selBucket == null ? "none" : "inline-block";
-      btn.onclick = () => { state.filters.cortesiaBucket = null; renderCortesia(); };
-    }
-  }
-
-  // Tabla de abonados cortesía
-  let rows = computeRanking({
-    scope: "cortesia",
-    search: state.filters.cortesiaSearch,
-    contact: "todos",
-    bucketFilt: state.filters.cortesiaBucket,
-  });
-  const missPid = state.filters.cortesiaPartidoMiss;
-  if (missPid) {
-    const p = state.data.partidos.find(x => x.id === missPid);
-    if (p) {
-      const accSet = state.accesosSets.get(p.id) || new Set();
-      rows = rows.filter(r => {
-        const a = state.data.abonados[r._idx];
-        if (!isEligible(a, p.fecha)) return false;
-        return !accSet.has(r._idx);
-      });
-    }
-  }
-  const sorted = sortRows(rows, state.sortCortesia);
-  const limit  = state.filters.cortesiaLimit || sorted.length;
-  const view   = limit > 0 ? sorted.slice(0, limit) : sorted;
-
-  const banner = document.getElementById("cortesia-filter-banner");
-  if (banner) {
-    const parts = [];
-    if (missPid) {
-      const p = state.data.partidos.find(x => x.id === missPid);
-      if (p) parts.push(`Faltantes al partido vs <b>${p.rival}</b>`);
-    }
-    if (state.filters.cortesiaBucket != null) {
-      parts.push(`Asistieron a <b>${state.filters.cortesiaBucket}</b> partidos`);
-    }
-    if (parts.length) {
-      banner.style.display = "flex";
-      banner.innerHTML = `<span>Mostrando: ${parts.join(" · ")} · <b>${rows.length.toLocaleString("es-MX")}</b> abonados</span>
-        <button class="reset" onclick="state.filters.cortesiaPartidoMiss=null; state.filters.cortesiaBucket=null; renderCortesia();">Limpiar filtros</button>`;
-    } else {
-      banner.style.display = "none";
-    }
-  }
-
-  const tbody = $("#tabla-cortesia tbody");
-  tbody.innerHTML = "";
-  $("#cortesia-empty").style.display = view.length ? "none" : "block";
-  applySortIndicators("tabla-cortesia", state.sortCortesia);
-
-  const frag = document.createDocumentFragment();
-  for (const r of view) {
-    const contacto = [r.correo, r.telefono].filter(Boolean).join(" · ");
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${escapeHTML(r.nombre) || "<span class='muted'>—</span>"}</td>
-      <td class="muted">${escapeHTML(r.orden)}</td>
-      <td class="muted">${escapeHTML(r.barcode) || "—"}</td>
-      <td class="muted">${escapeHTML(r.asiento) || "—"}</td>
-      <td class="muted">${escapeHTML(r.zona) || "—"}</td>
-      <td class="muted">${escapeHTML(contacto) || "—"}</td>
-      <td class="num">${r.elegibles}</td>
-      <td class="num">${r.asistidos}</td>
-      <td class="num">${fmtPct(r.pct)}<span class="pct-bar"><span style="width:${Math.round((r.pct||0)*100)}%"></span></span></td>
-    `;
-    frag.appendChild(tr);
-  }
-  tbody.appendChild(frag);
-}
-
-function wireCortesiaFilters() {
-  $("#f-cortesia-limit")?.addEventListener("change", e => { state.filters.cortesiaLimit = parseInt(e.target.value,10)||0; renderCortesia(); });
-  $("#f-cortesia-search")?.addEventListener("input",  e => { state.filters.cortesiaSearch = e.target.value.trim().toLowerCase(); renderCortesia(); });
-  document.querySelectorAll("#tabla-cortesia th.sortable").forEach(th => {
-    th.addEventListener("click", () => toggleSort(state.sortCortesia, th.dataset.key, renderCortesia));
   });
 }
 
