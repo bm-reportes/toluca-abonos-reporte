@@ -611,9 +611,7 @@
       <a class="nav-item" data-page="ms-partidos">
         <span class="ico">▥</span> Por partido
       </a>
-      <a class="nav-item" data-page="ms-zonas">
-        <span class="ico">▨</span> Por zona
-      </a>
+
       <a class="nav-item" data-page="ms-revendedores">
         <span class="ico">⭳</span> Revendedores
       </a>
@@ -863,37 +861,6 @@
   </section>
 
   <!-- PÁGINA: MS POR ZONA -->
-  <section class="page" id="page-ms-zonas">
-    <div class="page-header">
-      <div>
-        <h1>Eficiencia de Mercado Secundario · Por zona</h1>
-        <div class="subtitle">Qué zonas se venden más y variabilidad de precios</div>
-      </div>
-      <div class="filters" style="margin:0">
-        <div class="field">
-          <label for="f-ms-partido-zona">Partido</label>
-          <select id="f-ms-partido-zona"><option value="">Todos</option></select>
-        </div>
-      </div>
-    </div>
-    <div class="card table-wrap">
-      <table id="tabla-ms-zonas">
-        <thead>
-          <tr>
-            <th class="sortable" data-key="zona">Zona</th>
-            <th class="num sortable" data-key="total">Listings</th>
-            <th class="num sortable" data-key="vendidos">Vendidos</th>
-            <th class="num sortable" data-key="expirados">Expirados</th>
-            <th class="num sortable" data-key="pctVendidos">% vendidos</th>
-            <th class="num sortable" data-key="precioVendProm">Precio prom. vendidos</th>
-            <th class="num sortable" data-key="precioExpProm">Precio prom. expirados</th>
-            <th class="num sortable" data-key="delta">Δ (vend − exp)</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </section>
 
   <!-- PÁGINA: DIGITAL FULL -->
   <section class="page" id="page-full">
@@ -1058,7 +1025,7 @@ const state = {
     rankContact: "todos",  // "todos" | "con" | "sin"
     rankBucket: null,      // null | N  -> filtra al bucket de N partidos asistidos
     msPartido: "",
-    msPartidoZona: "",
+
     msEstatus: "",
     msLimit: 10,
     msSearch: "",
@@ -1076,7 +1043,7 @@ const state = {
   sortPartidos: { key: "fecha",  dir: "asc"  },
   sortRanking:  { key: "pct",    dir: "asc"  },
   sortMS:       { key: "total",  dir: "desc" },
-  sortMSZonas:  { key: "total",  dir: "desc" },
+
   sortFull:     { key: "pct",    dir: "desc" },
   chart: null,          // gráfica abonos no usados
   chartMS: null,        // gráfica MS por partido
@@ -1179,19 +1146,14 @@ function wireFilters() {
     }
   };
   fillSelect($("#f-ms-partido"));
-  fillSelect($("#f-ms-partido-zona"));
 
   $("#f-ms-partido")?.addEventListener("change",  e => { state.filters.msPartido = e.target.value; renderMS(); });
-  $("#f-ms-partido-zona")?.addEventListener("change", e => { state.filters.msPartidoZona = e.target.value; renderMSZonas(); });
   $("#f-ms-estatus")?.addEventListener("change", e => { state.filters.msEstatus = e.target.value; renderMS(); });
   $("#f-ms-limit")?.addEventListener("change",   e => { state.filters.msLimit = parseInt(e.target.value,10)||0; renderMS(); });
   $("#f-ms-search")?.addEventListener("input",   e => { state.filters.msSearch = e.target.value.trim().toLowerCase(); renderMS(); });
 
   document.querySelectorAll("#tabla-ms th.sortable").forEach(th => {
     th.addEventListener("click", () => toggleSort(state.sortMS, th.dataset.key, renderMS));
-  });
-  document.querySelectorAll("#tabla-ms-zonas th.sortable").forEach(th => {
-    th.addEventListener("click", () => toggleSort(state.sortMSZonas, th.dataset.key, renderMSZonas));
   });
 
   // ---- Navegación entre páginas ----
@@ -1768,65 +1730,6 @@ function renderMSInvList() {
   }).join("");
 }
 
-function computeMSZonas(scope) {
-  const fp = state.filters.msPartidoZona;  // filtro propio de la página "Por zona"
-  const fe = null;                          // estatus no aplica en análisis por zona
-  const abonados = state.data.abonados;
-  const agg = new Map();  // zona -> { total, vendidos, expirados, preciosV, preciosE }
-
-  for (const r of (state.data.reventas || [])) {
-    const a = abonados[r.a];
-    if (!a || !inScope(a, scope)) continue;
-    if (fp && r.rival !== fp) continue;
-    const zona = a.zona || "(sin zona)";
-    let o = agg.get(zona);
-    if (!o) { o = { zona, total: 0, vendidos: 0, expirados: 0, preciosV: [], preciosE: [] }; agg.set(zona, o); }
-    o.total     += r.listings;
-    o.vendidos  += r.vendidos || 0;
-    if (r.vendio && typeof r.precio === "number") o.preciosV.push(r.precio);
-    o.expirados += r.expirados;
-    if (!r.vendio && typeof r.precio_listado === "number") o.preciosE.push(r.precio_listado);
-  }
-  const avg = arr => arr.length ? arr.reduce((s,x)=>s+x,0)/arr.length : null;
-  return Array.from(agg.values()).map(o => {
-    const pV = avg(o.preciosV), pE = avg(o.preciosE);
-    return {
-      zona: o.zona,
-      total: o.total,
-      vendidos: o.vendidos,
-      expirados: o.expirados,
-      pctVendidos: o.total > 0 ? o.vendidos / o.total : 0,
-      precioVendProm: pV,
-      precioExpProm: pE,
-      delta: (pV != null && pE != null) ? pV - pE : null,
-    };
-  });
-}
-
-function renderMSZonas() {
-  const tbody = document.querySelector("#tabla-ms-zonas tbody");
-  if (!tbody) return;
-  const rows = sortRows(computeMSZonas(), state.sortMSZonas);
-  applySortIndicators("tabla-ms-zonas", state.sortMSZonas);
-  tbody.innerHTML = "";
-  const money = n => n == null ? "—" : "$" + Math.round(n).toLocaleString("es-MX");
-  const frag = document.createDocumentFragment();
-  for (const r of rows) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${escapeHTML(r.zona)}</td>
-      <td class="num">${r.total.toLocaleString("es-MX")}</td>
-      <td class="num">${r.vendidos.toLocaleString("es-MX")}</td>
-      <td class="num">${r.expirados.toLocaleString("es-MX")}</td>
-      <td class="num">${fmtPct(r.pctVendidos)}<span class="pct-bar"><span style="width:${Math.round(r.pctVendidos*100)}%"></span></span></td>
-      <td class="num">${money(r.precioVendProm)}</td>
-      <td class="num">${money(r.precioExpProm)}</td>
-      <td class="num">${r.delta == null ? "—" : (r.delta >= 0 ? "+" : "") + money(r.delta)}</td>
-    `;
-    frag.appendChild(tr);
-  }
-  tbody.appendChild(frag);
-}
 
 function renderMSIngresos() {
   const ctx = document.getElementById("chart-ms-ingresos");
@@ -2094,7 +1997,7 @@ function renderMS() {
   renderMSInvList();
   renderMSAbonadosChart();
   renderMSIngresos();
-  renderMSZonas();
+
   renderMSHeatmap();
   const { rows, totalListings, totalVend, totalExp } = computeMS();
 
