@@ -586,9 +586,6 @@
       <a class="nav-item active" data-page="resumen">
         <span class="ico">▦</span> Resumen
       </a>
-      <a class="nav-item" data-page="partidos">
-        <span class="ico">◉</span> Detalle por partido
-      </a>
       <a class="nav-item" data-page="full">
         <span class="ico">★</span> Digital FULL
       </a>
@@ -647,6 +644,31 @@
       </div>
     </div>
 
+    <div style="margin-top:24px; margin-bottom:8px">
+      <h2 style="margin:0; font-size:17px; font-weight:700">Detalle por partido</h2>
+      <div style="color: var(--text-muted); font-size:12px; margin-top:3px">Solo abonos · elegibles = abonados con vigencia al partido · todas las cuentas son abonados únicos</div>
+    </div>
+    <div class="card table-wrap">
+      <table id="tabla-partidos">
+        <thead>
+          <tr>
+            <th class="sortable" data-key="fecha">Fecha</th>
+            <th class="sortable" data-key="rival">Rival</th>
+            <th class="num sortable" data-key="elegibles" title="Abonados que tenían vigencia al momento del partido. Excluye los abonos emitidos posteriormente.">Elegibles</th>
+            <th class="num sortable" data-key="asistencias" title="Abonados que entraron físicamente al estadio.">Asist. directa</th>
+            <th class="num sortable" data-key="reventaVendida" title="Abonados ÚNICOS que no fueron pero al menos una de sus reventas se vendió. El asiento fue usado por un tercero.">Reventa vendida</th>
+            <th class="num sortable" data-key="vaciosReales" title="Asientos que nadie ocupó: elegibles − asistencia − reventa vendida. Suma 'listó sin vender' + 'vacío sin listar' (abonados únicos).">Vacíos reales</th>
+            <th class="num sortable" data-key="listoSinVender" title="Subset de los vacíos reales: abonados que SÍ intentaron vender (listaron en MS) pero ninguno de sus listings vendió.">Intentaron vender</th>
+            <th class="num sortable" data-key="pctUso" title="(Asist. directa + Reventa vendida) / Elegibles">% uso</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="empty" id="partidos-empty" style="display:none">
+        No hay partidos que coincidan con los filtros.
+      </div>
+    </div>
+
     <div class="card chart-card" style="margin-top:20px">
       <div class="chart-header" style="flex-direction:column; align-items:flex-start; gap:10px">
         <div style="display:flex; align-items:center; justify-content:space-between; width:100%; flex-wrap:wrap; gap:10px">
@@ -676,36 +698,6 @@
         </div>
       </div>
       <div id="zonas-list" class="zonas-list"></div>
-    </div>
-  </section>
-
-  <!-- PÁGINA: DETALLE POR PARTIDO -->
-  <section class="page" id="page-partidos">
-    <div class="page-header">
-      <div>
-        <h1>Detalle por partido</h1>
-        <div class="subtitle">Solo abonos · elegibles = abonados con vigencia al partido · todas las cuentas son abonados únicos</div>
-      </div>
-    </div>
-    <div class="card table-wrap">
-      <table id="tabla-partidos">
-        <thead>
-          <tr>
-            <th class="sortable" data-key="fecha">Fecha</th>
-            <th class="sortable" data-key="rival">Rival</th>
-            <th class="num sortable" data-key="elegibles" title="Abonados que tenían vigencia al momento del partido. Excluye los abonos emitidos posteriormente.">Elegibles</th>
-            <th class="num sortable" data-key="asistencias" title="Abonados que entraron físicamente al estadio.">Asist. directa</th>
-            <th class="num sortable" data-key="reventaVendida" title="Abonados ÚNICOS que no fueron pero al menos una de sus reventas se vendió. El asiento fue usado por un tercero.">Reventa vendida</th>
-            <th class="num sortable" data-key="vaciosReales" title="Asientos que nadie ocupó: elegibles − asistencia − reventa vendida. Suma 'listó sin vender' + 'vacío sin listar' (abonados únicos).">Vacíos reales</th>
-            <th class="num sortable" data-key="listoSinVender" title="Subset de los vacíos reales: abonados que SÍ intentaron vender (listaron en MS) pero ninguno de sus listings vendió.">Intentaron vender</th>
-            <th class="num sortable" data-key="pctUso" title="(Asist. directa + Reventa vendida) / Elegibles">% uso</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-      <div class="empty" id="partidos-empty" style="display:none">
-        No hay partidos que coincidan con los filtros.
-      </div>
     </div>
   </section>
 
