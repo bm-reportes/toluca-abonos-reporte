@@ -1346,10 +1346,9 @@ function computePartidoStats(scope) {
         else                                                  vacioSinListar++;
       }
     }
+    const ausencias    = elegibles - asistencias;
     const vaciosReales = listoSinVender + vacioSinListar;
     // reventa = todos los que vendieron en MS (comprador asistió o no)
-    // Los que asistieron ya están en accSet → asistencias - reventaSinAsist = coincidencias
-    // No podemos derivarlos sin asistenciasMS, así que usamos reventasByPartido para contarlos.
     let reventaTotal = 0;
     for (const [, r] of partidoReventa) {
       if (r.vendido) reventaTotal++;
@@ -1359,6 +1358,7 @@ function computePartidoStats(scope) {
       partido: p,
       elegibles,
       asistencias,
+      ausencias,
       reventa: reventaTotal,
       reventaSinAsist,   // para el gráfico apilado (categoría exclusiva)
       listoSinVender,
