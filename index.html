@@ -589,6 +589,9 @@
       <a class="nav-item" data-page="full">
         <span class="ico">★</span> Digital FULL
       </a>
+      <a class="nav-item" data-page="cortesia">
+        <span class="ico">🎁</span> Abonos cortesía
+      </a>
     </div>
     <div class="nav-group">
       <div class="nav-group-label">2 · Eficiencia de Mercado Secundario</div>
@@ -971,6 +974,83 @@
     </div>
   </section>
 
+  <!-- PÁGINA: ABONOS CORTESÍA -->
+  <section class="page" id="page-cortesia">
+    <div class="page-header">
+      <div>
+        <h1>Abonos cortesía</h1>
+        <div class="subtitle">Abonados con tipo <b>CORTESÍA</b> en la orden de emisión</div>
+      </div>
+    </div>
+
+    <div class="kpi-grid" style="margin-bottom:20px">
+      <div class="kpi"><div class="label">Abonados cortesía</div><div class="value" id="kpi-cortesia-abonados">—</div></div>
+      <div class="kpi"><div class="label">Partidos</div><div class="value" id="kpi-cortesia-partidos">—</div></div>
+    </div>
+
+    <div class="card chart-card" style="margin-bottom:20px">
+      <div class="chart-header">
+        <div style="display:flex; align-items:center; gap:6px">
+          <h2 style="margin:0">Composición por partido (Cortesía)</h2>
+          <span class="info-icon" title="Apilado: Asistentes (verde) y Asientos vacíos (rojo). Click en una barra para filtrar la tabla a quienes faltaron a ese partido.">i</span>
+        </div>
+        <button class="reset" id="f-cortesia-partido-clear" style="display:none">Limpiar selección</button>
+      </div>
+      <div class="chart-box" style="height:440px"><canvas id="chart-cortesia-nousados"></canvas></div>
+    </div>
+
+    <div class="card" style="padding:18px 20px; margin-bottom:16px">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px">
+        <div>
+          <h3 style="margin:0; font-size:14px; font-weight:600">Frecuencia de asistencia (Cortesía)</h3>
+          <div style="font-size:12px; color: var(--text-muted); margin-top:2px">
+            Cuántos abonados cortesía asistieron a N partidos · <span style="color: var(--accent)">Click en una barra para filtrar la tabla</span>
+          </div>
+        </div>
+        <button class="reset" id="f-cortesia-bucket-clear" style="display:none">Limpiar selección</button>
+      </div>
+      <div class="chart-box" style="height:280px"><canvas id="chart-cortesia-fid"></canvas></div>
+    </div>
+
+    <div id="cortesia-filter-banner" style="display:none; padding:10px 14px; background: var(--accent-soft); border:1px solid var(--accent); border-radius: 8px; margin-bottom:12px; font-size:13px; color: var(--text); display:flex; align-items:center; justify-content:space-between; gap:10px"></div>
+
+    <div class="filters" style="margin-bottom:12px">
+      <div class="field">
+        <label for="f-cortesia-limit">Mostrar</label>
+        <select id="f-cortesia-limit">
+          <option value="50">Top 50</option>
+          <option value="100">Top 100</option>
+          <option value="250">Top 250</option>
+          <option value="0">Todos</option>
+        </select>
+      </div>
+      <div class="field" style="flex:1; min-width:220px">
+        <label for="f-cortesia-search">Buscar (nombre, correo, ID)</label>
+        <input id="f-cortesia-search" type="search" placeholder="Ej. López, @gmail.com…" />
+      </div>
+    </div>
+
+    <div class="card table-wrap">
+      <table id="tabla-cortesia">
+        <thead>
+          <tr>
+            <th class="sortable" data-key="nombre">Nombre</th>
+            <th class="sortable" data-key="orden">Orden</th>
+            <th class="sortable" data-key="barcode">Código barras</th>
+            <th class="sortable" data-key="asiento">Asiento</th>
+            <th class="sortable" data-key="zona">Zona</th>
+            <th class="sortable" data-key="contacto">Contacto</th>
+            <th class="num sortable" data-key="elegibles">Elegibles</th>
+            <th class="num sortable" data-key="asistidos">Asistidos</th>
+            <th class="num sortable" data-key="pct">% asistencia</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="empty" id="cortesia-empty" style="display:none">No hay abonados cortesía que coincidan.</div>
+    </div>
+  </section>
+
   <!-- PÁGINA: MS REVENDEDORES -->
   <section class="page" id="page-ms-revendedores">
     <div class="page-header">
@@ -1063,8 +1143,12 @@ const state = {
     msSearch: "",
     fullLimit: 50,
     fullSearch: "",
-    fullBucket: null,         // N asistencias seleccionadas (histograma FULL)
-    fullPartidoMiss: null,    // P### seleccionado (no usados por partido FULL)
+    fullBucket: null,
+    fullPartidoMiss: null,
+    cortesiaLimit: 50,
+    cortesiaSearch: "",
+    cortesiaBucket: null,
+    cortesiaPartidoMiss: null,
     chartSort: "cron",  // "cron" | "desc" | "asc"  (gráfica abonos no usados)
     heatmapSort: "cron",  // "cron" | "listings" | "rechazo" (heatmap MS por partido)
     ausentesPartido: null,  // partido_id si se filtra el panel "Ausentes por zona"
@@ -1077,18 +1161,23 @@ const state = {
   sortMS:       { key: "total",  dir: "desc" },
   sortMSZonas:  { key: "total",  dir: "desc" },
   sortFull:     { key: "pct",    dir: "desc" },
+  sortCortesia: { key: "pct",    dir: "desc" },
   chart: null,          // gráfica abonos no usados
   chartMS: null,        // gráfica MS por partido
   chartMSIng: null,     // gráfica MS ingresos por partido
   chartFid: null,       // histograma de fidelidad (Ranking)
-  chartFull: null,      // gráfica no usados Digital FULL
-  chartFullFid: null,   // histograma de fidelidad Digital FULL
+  chartFull: null,
+  chartFullFid: null,
+  chartCortesia: null,
+  chartCortesiaFid: null,
 };
 
 // Filtro por ámbito de evento. Devuelve true si el abonado pertenece al scope actual.
 function inScope(a, scope) {
   scope = scope || state.scope || "main";
-  return scope === "full" ? !!a.esFull : !a.esFull;
+  if (scope === "full")     return !!a.esFull;
+  if (scope === "cortesia") return !!a.esCortesia;
+  return !a.esFull;
 }
 
 // ---------- utilidades -------------------------------------------------
@@ -1203,10 +1292,12 @@ function wireFilters() {
       if (page === "ranking")     renderHistogramaFidelidad();
       if (page === "ms-partidos") { renderMSInvList(); renderMSIngresos(); }
       if (page === "full")        renderFull();
+      if (page === "cortesia")    renderCortesia();
     });
   });
 
   wireFullFilters();
+  wireCortesiaFilters();
 
   // Tabs de orden para la gráfica "Abonos no usados por partido"
   document.querySelectorAll("#chart-sort-tabs button").forEach(btn => {
@@ -1445,6 +1536,7 @@ function render() {
   renderRanking();
   renderMS();
   renderFull();
+  renderCortesia();
 }
 
 // Ausentes (no asistieron físicamente) agrupados por zona del estadio.
@@ -2548,6 +2640,251 @@ function wireFullFilters() {
   $("#f-full-search")?.addEventListener("input",  e => { state.filters.fullSearch = e.target.value.trim().toLowerCase(); renderFull(); });
   document.querySelectorAll("#tabla-full th.sortable").forEach(th => {
     th.addEventListener("click", () => toggleSort(state.sortFull, th.dataset.key, renderFull));
+  });
+}
+
+function renderCortesia() {
+  if (!$("#tabla-cortesia")) return;
+
+  const cortesiaCount = state.data.abonados.reduce((s,a) => s + (a.esCortesia ? 1 : 0), 0);
+  const stats = computePartidoStats("cortesia");
+
+  $("#kpi-cortesia-abonados").textContent = cortesiaCount.toLocaleString("es-MX");
+  $("#kpi-cortesia-partidos").textContent = stats.length.toLocaleString("es-MX");
+
+  // Gráfica apilada por partido
+  const ctx1 = document.getElementById("chart-cortesia-nousados");
+  if (ctx1) {
+    const labels     = stats.map(s => s.partido.rival || "—");
+    const dataAsist  = stats.map(s => s.asistencias);
+    const dataVacios = stats.map(s => s.ausencias);
+    const pids       = stats.map(s => s.partido.id);
+    const totalsArr  = stats.map(s => s.elegibles);
+    const selPid     = state.filters.cortesiaPartidoMiss;
+
+    const dimVacios = dataVacios.map((_, i) => selPid == null ? "rgba(239, 68, 68, .85)" : (pids[i] === selPid ? "rgba(239, 68, 68, 1)" : "rgba(239, 68, 68, .25)"));
+    const dimAsist  = dataAsist.map((_, i)  => selPid == null ? "rgba(52, 211, 153, .9)"  : (pids[i] === selPid ? "rgba(52, 211, 153, 1)"  : "rgba(52, 211, 153, .25)"));
+
+    const totalsPlugin = {
+      id: "totalsCortesiaNou",
+      afterDatasetsDraw(chart) {
+        const { ctx: c, scales: { x, y } } = chart;
+        c.save();
+        c.font = "700 12px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+        c.textBaseline = "bottom"; c.textAlign = "center";
+        c.fillStyle = "#e7ebf3";
+        for (let i = 0; i < stats.length; i++) {
+          let visibleTotal = 0;
+          for (let dsi = 0; dsi < chart.data.datasets.length; dsi++) {
+            if (chart.isDatasetVisible(dsi)) visibleTotal += chart.data.datasets[dsi].data[i] || 0;
+          }
+          if (!visibleTotal) continue;
+          const px = x.getPixelForValue(i);
+          const py = y.getPixelForValue(visibleTotal) - 4;
+          c.fillText(visibleTotal.toLocaleString("es-MX"), px, py);
+        }
+        c.restore();
+      }
+    };
+
+    if (state.chartCortesia) state.chartCortesia.destroy();
+    state.chartCortesia = new Chart(ctx1, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          { label: "Asistentes",      data: dataAsist,  backgroundColor: dimAsist,  stack: "c", borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 6, bottomRight: 6 } },
+          { label: "Asientos vacíos", data: dataVacios, backgroundColor: dimVacios, stack: "c", borderRadius: { topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0 } },
+        ]
+      },
+      plugins: [totalsPlugin],
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        layout: { padding: { top: 24 } },
+        onClick: (evt, elements) => {
+          if (!elements || !elements.length) return;
+          const pid = pids[elements[0].index];
+          state.filters.cortesiaPartidoMiss = (state.filters.cortesiaPartidoMiss === pid) ? null : pid;
+          renderCortesia();
+        },
+        onHover: (evt, elements) => { evt.native.target.style.cursor = elements.length ? "pointer" : "default"; },
+        plugins: {
+          legend: { display: true, position: "top", align: "end", labels: { color: "#e7ebf3", boxWidth: 10, boxHeight: 10, padding: 14, font: { size: 12 } } },
+          tooltip: {
+            callbacks: {
+              label: (c) => {
+                const v = c.parsed.y;
+                const t = totalsArr[c.dataIndex] || 1;
+                return `${c.dataset.label}: ${v.toLocaleString("es-MX")} (${(v/t*100).toFixed(1)}%)`;
+              },
+              footer: (items) => `Total elegibles: ${totalsArr[items[0].dataIndex].toLocaleString("es-MX")} · Click para ver faltantes`
+            }
+          }
+        },
+        scales: {
+          x: { stacked: true, ticks: { color: "#e7ebf3", font: { weight: "600" }, autoSkip: false, maxRotation: 45, minRotation: 45 }, grid: { display: false } },
+          y: { stacked: true, ticks: { color: "#9098a9", precision: 0 }, grid: { display: false }, beginAtZero: true }
+        }
+      }
+    });
+
+    const btn = document.getElementById("f-cortesia-partido-clear");
+    if (btn) {
+      btn.style.display = selPid == null ? "none" : "inline-block";
+      btn.onclick = () => { state.filters.cortesiaPartidoMiss = null; renderCortesia(); };
+    }
+  }
+
+  // Histograma de fidelidad (Cortesía)
+  const ctx2 = document.getElementById("chart-cortesia-fid");
+  if (ctx2) {
+    const partidos = partidosFiltrados();
+    const nPart = partidos.length;
+    const abonados = state.data.abonados;
+    const buckets = new Array(nPart + 1).fill(0);
+    for (let i = 0; i < abonados.length; i++) {
+      const a = abonados[i];
+      if (!a.esCortesia) continue;
+      let asistidos = 0;
+      for (const p of partidos) {
+        if (!isEligible(a, p.fecha)) continue;
+        const s = state.accesosSets.get(p.id);
+        if (s && s.has(i)) asistidos++;
+      }
+      buckets[asistidos]++;
+    }
+    const labels = buckets.map((_, i) => String(i));
+    const selBucket = state.filters.cortesiaBucket;
+    const bgBuckets = buckets.map((_, i) =>
+      selBucket == null ? "#ef4444" : (i === selBucket ? "#ef4444" : "#ef444455"));
+    const totalAll = buckets.reduce((s,v) => s+v, 0) || 1;
+
+    const totalsPlugin = {
+      id: "totalsCortesia",
+      afterDatasetsDraw(chart) {
+        const { ctx, scales: { x, y } } = chart;
+        ctx.save();
+        ctx.font = "600 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+        ctx.fillStyle = "#e7ebf3";
+        ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+        for (let i = 0; i < buckets.length; i++) {
+          if (!buckets[i]) continue;
+          ctx.fillText(buckets[i].toLocaleString("es-MX"), x.getPixelForValue(i), y.getPixelForValue(buckets[i]) - 4);
+        }
+        ctx.restore();
+      }
+    };
+    if (state.chartCortesiaFid) state.chartCortesiaFid.destroy();
+    state.chartCortesiaFid = new Chart(ctx2, {
+      type: "bar",
+      data: { labels, datasets: [{ label: "Abonados cortesía", data: buckets, backgroundColor: bgBuckets, borderRadius: 4 }] },
+      plugins: [totalsPlugin],
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        layout: { padding: { top: 18 } },
+        onClick: (evt, elements) => {
+          if (!elements || !elements.length) return;
+          const idx = elements[0].index;
+          state.filters.cortesiaBucket = (state.filters.cortesiaBucket === idx) ? null : idx;
+          renderCortesia();
+        },
+        onHover: (evt, elements) => { evt.native.target.style.cursor = elements.length ? "pointer" : "default"; },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: (items) => `${items[0].label} partidos asistidos`,
+              label: (c) => `${c.parsed.y.toLocaleString("es-MX")} abonados (${(c.parsed.y/totalAll*100).toFixed(1)}%)`,
+              afterLabel: () => "Click para filtrar la tabla"
+            }
+          }
+        },
+        scales: {
+          x: { title: { display: true, text: "Partidos asistidos", color: "#8a92a5" }, ticks: { color: "#8a92a5" }, grid: { display: false } },
+          y: { ticks: { color: "#8a92a5", precision: 0 }, grid: { display: false }, beginAtZero: true }
+        }
+      }
+    });
+
+    const btn = document.getElementById("f-cortesia-bucket-clear");
+    if (btn) {
+      btn.style.display = selBucket == null ? "none" : "inline-block";
+      btn.onclick = () => { state.filters.cortesiaBucket = null; renderCortesia(); };
+    }
+  }
+
+  // Tabla de abonados cortesía
+  let rows = computeRanking({
+    scope: "cortesia",
+    search: state.filters.cortesiaSearch,
+    contact: "todos",
+    bucketFilt: state.filters.cortesiaBucket,
+  });
+  const missPid = state.filters.cortesiaPartidoMiss;
+  if (missPid) {
+    const p = state.data.partidos.find(x => x.id === missPid);
+    if (p) {
+      const accSet = state.accesosSets.get(p.id) || new Set();
+      rows = rows.filter(r => {
+        const a = state.data.abonados[r._idx];
+        if (!isEligible(a, p.fecha)) return false;
+        return !accSet.has(r._idx);
+      });
+    }
+  }
+  const sorted = sortRows(rows, state.sortCortesia);
+  const limit  = state.filters.cortesiaLimit || sorted.length;
+  const view   = limit > 0 ? sorted.slice(0, limit) : sorted;
+
+  const banner = document.getElementById("cortesia-filter-banner");
+  if (banner) {
+    const parts = [];
+    if (missPid) {
+      const p = state.data.partidos.find(x => x.id === missPid);
+      if (p) parts.push(`Faltantes al partido vs <b>${p.rival}</b>`);
+    }
+    if (state.filters.cortesiaBucket != null) {
+      parts.push(`Asistieron a <b>${state.filters.cortesiaBucket}</b> partidos`);
+    }
+    if (parts.length) {
+      banner.style.display = "flex";
+      banner.innerHTML = `<span>Mostrando: ${parts.join(" · ")} · <b>${rows.length.toLocaleString("es-MX")}</b> abonados</span>
+        <button class="reset" onclick="state.filters.cortesiaPartidoMiss=null; state.filters.cortesiaBucket=null; renderCortesia();">Limpiar filtros</button>`;
+    } else {
+      banner.style.display = "none";
+    }
+  }
+
+  const tbody = $("#tabla-cortesia tbody");
+  tbody.innerHTML = "";
+  $("#cortesia-empty").style.display = view.length ? "none" : "block";
+  applySortIndicators("tabla-cortesia", state.sortCortesia);
+
+  const frag = document.createDocumentFragment();
+  for (const r of view) {
+    const contacto = [r.correo, r.telefono].filter(Boolean).join(" · ");
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHTML(r.nombre) || "<span class='muted'>—</span>"}</td>
+      <td class="muted">${escapeHTML(r.orden)}</td>
+      <td class="muted">${escapeHTML(r.barcode) || "—"}</td>
+      <td class="muted">${escapeHTML(r.asiento) || "—"}</td>
+      <td class="muted">${escapeHTML(r.zona) || "—"}</td>
+      <td class="muted">${escapeHTML(contacto) || "—"}</td>
+      <td class="num">${r.elegibles}</td>
+      <td class="num">${r.asistidos}</td>
+      <td class="num">${fmtPct(r.pct)}<span class="pct-bar"><span style="width:${Math.round((r.pct||0)*100)}%"></span></span></td>
+    `;
+    frag.appendChild(tr);
+  }
+  tbody.appendChild(frag);
+}
+
+function wireCortesiaFilters() {
+  $("#f-cortesia-limit")?.addEventListener("change", e => { state.filters.cortesiaLimit = parseInt(e.target.value,10)||0; renderCortesia(); });
+  $("#f-cortesia-search")?.addEventListener("input",  e => { state.filters.cortesiaSearch = e.target.value.trim().toLowerCase(); renderCortesia(); });
+  document.querySelectorAll("#tabla-cortesia th.sortable").forEach(th => {
+    th.addEventListener("click", () => toggleSort(state.sortCortesia, th.dataset.key, renderCortesia));
   });
 }
 
