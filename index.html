@@ -663,7 +663,7 @@
             <th class="sortable" data-key="fecha">Fecha</th>
             <th class="sortable" data-key="rival">Rival</th>
             <th class="num sortable" data-key="elegibles" title="Abonados que tenían vigencia al momento del partido. Excluye los abonos emitidos posteriormente.">Elegibles</th>
-            <th class="num sortable" data-key="asistencias" title="Abonados que entraron físicamente al estadio.">Asist. directa</th>
+            <th class="num sortable" data-key="asistencias" title="Abonados cuyo acceso fue registrado. La nota 'via MS' indica cuántos de esos accesos corresponden a un ticket que el titular vendió en el mercado secundario (el comprador entró con ese código de barras).">Asist. directa</th>
             <th class="num sortable" data-key="reventaVendida" title="Abonados ÚNICOS que no fueron pero al menos una de sus reventas se vendió. El asiento fue usado por un tercero.">Reventa vendida</th>
             <th class="num sortable" data-key="vaciosReales" title="Asientos que nadie ocupó: elegibles − asistencia − reventa vendida. Suma 'listó sin vender' + 'vacío sin listar' (abonados únicos).">Vacíos reales</th>
             <th class="num sortable" data-key="listoSinVender" title="Subset de los vacíos reales: abonados que SÍ intentaron vender (listaron en MS) pero ninguno de sus listings vendió.">Intentaron vender</th>
@@ -1334,7 +1334,7 @@ function computePartidoStats(scope) {
     const accSet         = state.accesosSets.get(p.id) || new Set();
     const partidoReventa = reventasMap.get(p.id) || new Map();
 
-    let elegibles = 0, asistencias = 0;
+    let elegibles = 0, asistencias = 0, asistenciasMS = 0;
     let reventaVendida = 0, listoSinVender = 0, vacioSinListar = 0;
 
     for (let i = 0; i < allAbonados.length; i++) {
@@ -1342,10 +1342,12 @@ function computePartidoStats(scope) {
       if (!isEligible(allAbonados[i], p.fecha)) continue;
       elegibles++;
 
+      const rev = partidoReventa.get(i);
       if (accSet.has(i)) {
         asistencias++;
+        // El titular vendió su abono pero igual aparece en accesos (el comprador entró con ese ticket)
+        if (rev && rev.vendido) asistenciasMS++;
       } else {
-        const rev = partidoReventa.get(i);
         if      (rev && rev.vendido)                          reventaVendida++;
         else if (rev && (rev.expirado || rev.disponible))     listoSinVender++;
         else                                                  vacioSinListar++;
@@ -1358,6 +1360,7 @@ function computePartidoStats(scope) {
       partido: p,
       elegibles,
       asistencias,
+      asistenciasMS,
       ausencias,
       reventaVendida,
       listoSinVender,
@@ -2123,6 +2126,7 @@ function renderTablaPartidos(stats) {
     rival: s.partido.rival || "",
     elegibles: s.elegibles,
     asistencias: s.asistencias,
+    asistenciasMS: s.asistenciasMS,
     reventaVendida: s.reventaVendida,
     listoSinVender: s.listoSinVender,
     vacioSinListar: s.vacioSinListar,
@@ -2138,7 +2142,10 @@ function renderTablaPartidos(stats) {
       <td>${fmtDate(s.fecha)}</td>
       <td>${s.rival || "—"}</td>
       <td class="num">${s.elegibles.toLocaleString("es-MX")}</td>
-      <td class="num">${s.asistencias.toLocaleString("es-MX")}</td>
+      <td class="num">
+        ${s.asistencias.toLocaleString("es-MX")}
+        ${s.asistenciasMS > 0 ? `<div style="font-size:11px;color:#60a5fa;margin-top:1px">${s.asistenciasMS.toLocaleString("es-MX")} via MS</div>` : ""}
+      </td>
       <td class="num" style="color:${s.reventaVendida > 0 ? '#60a5fa' : 'var(--text-muted)'}">${s.reventaVendida.toLocaleString("es-MX")}</td>
       <td class="num" style="color:${s.vaciosReales > 0 ? '#ef4444' : 'var(--text-muted)'}" title="${vaciosTooltip}">${s.vaciosReales.toLocaleString("es-MX")}</td>
       <td class="num" style="color:${s.listoSinVender > 0 ? '#f59e0b' : 'var(--text-muted)'}">${s.listoSinVender.toLocaleString("es-MX")}</td>

@@ -301,6 +301,14 @@ def build_reventas(abonados):
 
     agg = {}   # (idx, rival) -> entry
     no_match = 0
+    rivals_con_datos = set()  # rivales con ≥1 listing matcheado en formato corto (normalizado)
+
+    def norm(s):
+        """Normaliza nombre de rival para comparación (sin acentos, minúsculas).
+        Usa NFD para manejar caracteres compuestos/descompuestos del filesystem."""
+        import unicodedata
+        s = unicodedata.normalize("NFD", s)
+        return "".join(c for c in s if not unicodedata.combining(c)).lower()
 
     for f in sorted(ms_dir.iterdir()):
         if not f.is_file() or f.suffix.lower() != ".xlsx" or f.name.startswith("~"):
@@ -376,6 +384,60 @@ def build_reventas(abonados):
                 e["precio_listado"] = precio
 
         print(f"  MS {rival:20s} listings={total_f:>5}  ligables={match_f}")
+        if match_f > 0:
+            rivals_con_datos.add(norm(rival))
+
+    # Fallback: rivales sin datos en formato corto → leer Orden Detallada directo
+    detallado_dir = ms_dir / MS_DETALLADO_SUBDIR
+    if detallado_dir.is_dir():
+        for f in sorted(detallado_dir.iterdir()):
+            if not f.is_file() or f.suffix.lower() != ".xlsx" or f.name.startswith("~"):
+                continue
+            stem = f.stem
+            rival = stem[:-len(" detallado")] if stem.lower().endswith(" detallado") else stem
+            if norm(rival) in rivals_con_datos:
+                continue
+            count_det = 0
+            for d in read_sheet(f):
+                if not str(d.get("NÚMERO DE ORDEN") or "").startswith("R-"):
+                    continue
+                cb_restr = str(d.get("CÓDIGO DE BARRAS RESTRINGIDO") or "").strip()
+                idx = barcode_idx.get(cb_restr) if cb_restr else None
+                if idx is None:
+                    k = (d.get("ZONA") or "", d.get("SECCIÓN") or "", d.get("ASIENTO") or "")
+                    idx = idx_seat.get(k)
+                if idx is None:
+                    no_match += 1
+                    continue
+                precio_raw = d.get("PRECIO")
+                try:
+                    precio = int(precio_raw) if precio_raw not in (None, "", "-") else None
+                except (ValueError, TypeError):
+                    precio = None
+                fecha = parse_date(d.get("FECHA"))
+                key = (idx, rival)
+                if key not in agg:
+                    agg[key] = {
+                        "a": idx, "rival": rival,
+                        "listings": 0, "expirados": 0, "vendidos": 0,
+                        "vendio": False,
+                        "fecha": None, "ultimo": None,
+                        "precio": None, "precio_listado": None,
+                    }
+                e = agg[key]
+                e["listings"] += 1
+                e["vendio"]    = True
+                e["vendidos"] += 1
+                if precio is not None:
+                    e["precio"] = precio
+                    if e["precio_listado"] is None:
+                        e["precio_listado"] = precio
+                if fecha:
+                    if not e["fecha"]  or fecha < e["fecha"]:  e["fecha"]  = fecha
+                    if not e["ultimo"] or fecha > e["ultimo"]:  e["ultimo"] = fecha
+                count_det += 1
+            if count_det > 0:
+                print(f"  Detallado directo {rival:16s} ventas={count_det}")
 
     reventas = list(agg.values())
     print(f"  Reventas: {len(reventas)} pares abonado×partido  sin match: {no_match}")
