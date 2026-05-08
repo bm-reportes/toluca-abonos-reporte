@@ -789,12 +789,11 @@
       </div>
       <div class="filters" style="margin:0">
         <div class="field">
-          <label for="f-ms-estatus">Estatus</label>
+          <label for="f-ms-estatus">Resultado</label>
           <select id="f-ms-estatus">
             <option value="">Todos</option>
-            <option value="vendido">Vendido</option>
-            <option value="expirado">Expirado</option>
-            <option value="disponible">Disponible</option>
+            <option value="vendido">Vendió</option>
+            <option value="expirado">No vendió</option>
           </select>
         </div>
       </div>
@@ -1277,11 +1276,9 @@ function partidosFiltrados() {
     .sort((a,b) => a.fecha.localeCompare(b.fecha));
 }
 
-// Trackea reventas por partido a nivel de ABONADO ÚNICO (no de listing).
-// Un mismo abonado puede listar varias veces el mismo partido — aquí dedupea
-// y guarda los flags de qué estatus tuvo al menos una vez.
-// Cruza r.rival con p.rival y filtra por r.a -> abonado en scope (default: "main", excluye Digital FULL).
-// Retorna Map<partido_id, Map<abonado_idx, { vendido, expirado, disponible }>>.
+// Trackea reventas por partido a nivel de ABONADO ÚNICO.
+// Cada registro r ya es uno por (abonado × rival), con r.vendio y r.expirados.
+// Retorna Map<partido_id, Map<abonado_idx, { vendido, expirado }>>.
 function reventasByPartido(scope) {
   scope = scope || "main";
   const partidos = state.data.partidos || [];
@@ -1296,13 +1293,12 @@ function reventasByPartido(scope) {
     const a = abonados[r.a];
     if (!a || !inScope(a, scope)) continue;
     const pid = ridToPid.get(r.rival);
-    if (!pid) continue;  // Solo cuenta partidos de abono, ignora eventos sin partido
-    const partidoMap = out.get(pid);
-    let entry = partidoMap.get(r.a);
-    if (!entry) { entry = { vendido: false, expirado: false, disponible: false }; partidoMap.set(r.a, entry); }
-    if (r.estatus === "vendido")    entry.vendido = true;
-    if (r.estatus === "expirado")   entry.expirado = true;
-    if (r.estatus === "disponible") entry.disponible = true;
+    if (!pid) continue;
+    out.get(pid).set(r.a, {
+      vendido:  r.vendio,
+      expirado: !r.vendio && r.expirados > 0,
+      disponible: false,
+    });
   }
   return out;
 }
@@ -1495,7 +1491,8 @@ function renderAusentesPorZona() {
 }
 
 // ---------- mercado secundario ----------------------------------------
-// Agrega listings por abonado aplicando filtros globales y de MS.
+// Agrega por abonado. Cada r es un registro (abonado × rival) con:
+//   r.vendio, r.listings, r.expirados, r.fecha, r.ultimo, r.precio.
 function computeMS(scope) {
   const all = state.data.reventas || [];
   const fp  = state.filters.msPartido;
@@ -1503,17 +1500,21 @@ function computeMS(scope) {
   const q   = state.filters.msSearch;
   const abonados = state.data.abonados;
 
-  const agg = new Map(); // idx_abonado -> agregado
+  const agg = new Map();
   let totalListings = 0, totalVend = 0, totalExp = 0;
 
   for (const r of all) {
     const a = abonados[r.a];
     if (!a || !inScope(a, scope)) continue;
     if (fp && r.rival !== fp) continue;
-    if (fe && r.estatus !== fe) continue;
-    totalListings++;
-    if (r.estatus === "vendido")  totalVend++;
-    else if (r.estatus === "expirado") totalExp++;
+    // Filtro resultado: "vendido" = vendio, "expirado" = no vendió
+    if (fe === "vendido"  && !r.vendio)  continue;
+    if (fe === "expirado" &&  r.vendio)  continue;
+
+    totalListings += r.listings;
+    if (r.vendio) totalVend++;
+    totalExp += r.expirados;
+
     if (q) {
       const hay =
         (a.nombre   || "").toLowerCase().includes(q) ||
@@ -1527,33 +1528,30 @@ function computeMS(scope) {
     if (!o) {
       o = {
         idx: r.a,
-        nombre:  a.nombre  || "",
-        orden:   a.orden   || "",
-        asiento: a.asiento || "",
-        zona:    a.zona    || "",
-        correo:  a.correo  || "",
-        telefono:a.telefono|| "",
-        contacto:(a.correo || a.telefono || "").toLowerCase(),
-        total: 0, vendidos: 0, expirados: 0, disponibles: 0,
+        nombre:   a.nombre   || "",
+        orden:    a.orden    || "",
+        asiento:  a.asiento  || "",
+        zona:     a.zona     || "",
+        correo:   a.correo   || "",
+        telefono: a.telefono || "",
+        contacto: (a.correo || a.telefono || "").toLowerCase(),
+        total: 0, vendidos: 0, expirados: 0,
         primer: null, ultimo: null,
         rivalesSet: new Set(),
       };
       agg.set(r.a, o);
     }
-    o.total++;
-    if      (r.estatus === "vendido")    o.vendidos++;
-    else if (r.estatus === "expirado")   o.expirados++;
-    else if (r.estatus === "disponible") o.disponibles++;
-    if (r.fecha) {
-      if (!o.primer || r.fecha < o.primer) o.primer = r.fecha;
-      if (!o.ultimo || r.fecha > o.ultimo) o.ultimo = r.fecha;
-    }
+    o.total    += r.listings;
+    o.expirados += r.expirados;
+    if (r.vendio) o.vendidos++;
+    if (r.fecha)  { if (!o.primer || r.fecha  < o.primer) o.primer = r.fecha;  }
+    if (r.ultimo) { if (!o.ultimo || r.ultimo > o.ultimo) o.ultimo = r.ultimo; }
     o.rivalesSet.add(r.rival);
   }
 
   const rows = Array.from(agg.values()).map(o => ({
     ...o,
-    partidos: Array.from(o.rivalesSet).sort().join(", "),
+    partidos:      Array.from(o.rivalesSet).sort().join(", "),
     partidosCount: o.rivalesSet.size,
   }));
 
@@ -1567,11 +1565,12 @@ function msCountsByRival(scope) {
   for (const r of (state.data.reventas || [])) {
     const a = abonados[r.a];
     if (!a || !inScope(a, scope)) continue;
-    if (fe && r.estatus !== fe) continue;
+    if (fe === "vendido"  && !r.vendio) continue;
+    if (fe === "expirado" &&  r.vendio) continue;
     const cur = byRival.get(r.rival) || { total: 0, vendidos: 0, expirados: 0 };
-    cur.total++;
-    if (r.estatus === "vendido")  cur.vendidos++;
-    if (r.estatus === "expirado") cur.expirados++;
+    cur.total    += r.listings;
+    if (r.vendio) cur.vendidos++;
+    cur.expirados += r.expirados;
     byRival.set(r.rival, cur);
   }
   return byRival;
@@ -1756,13 +1755,13 @@ function computeMSZonas(scope) {
     const a = abonados[r.a];
     if (!a || !inScope(a, scope)) continue;
     if (fp && r.rival !== fp) continue;
-    if (fe && r.estatus !== fe) continue;
     const zona = a.zona || "(sin zona)";
     let o = agg.get(zona);
     if (!o) { o = { zona, total: 0, vendidos: 0, expirados: 0, preciosV: [], preciosE: [] }; agg.set(zona, o); }
-    o.total++;
-    if (r.estatus === "vendido")  { o.vendidos++;  if (typeof r.precio === "number") o.preciosV.push(r.precio); }
-    if (r.estatus === "expirado") { o.expirados++; if (typeof r.precio === "number") o.preciosE.push(r.precio); }
+    o.total += r.listings;
+    if (r.vendio)  { o.vendidos++;  if (typeof r.precio         === "number") o.preciosV.push(r.precio); }
+    o.expirados += r.expirados;
+    if (!r.vendio && typeof r.precio_listado === "number") o.preciosE.push(r.precio_listado);
   }
   const avg = arr => arr.length ? arr.reduce((s,x)=>s+x,0)/arr.length : null;
   return Array.from(agg.values()).map(o => {
@@ -1811,7 +1810,7 @@ function renderMSIngresos() {
   const abonados = state.data.abonados;
   const byRival = new Map();
   for (const r of (state.data.reventas || [])) {
-    if (r.estatus !== "vendido") continue;
+    if (!r.vendio) continue;
     if (typeof r.precio !== "number") continue;
     const a = abonados[r.a];
     if (!a || !inScope(a, "main")) continue;
@@ -1888,11 +1887,10 @@ function renderMSHeatmap() {
     const a = abonados[r.a];
     if (!a || !inScope(a, "main")) continue;
     let o = agg.get(r.rival);
-    if (!o) { o = { rival: r.rival, listings: 0, vendidos: 0, expirados: 0, disponibles: 0 }; agg.set(r.rival, o); }
-    o.listings++;
-    if      (r.estatus === "vendido")    o.vendidos++;
-    else if (r.estatus === "expirado")   o.expirados++;
-    else if (r.estatus === "disponible") o.disponibles++;
+    if (!o) { o = { rival: r.rival, listings: 0, vendidos: 0, expirados: 0 }; agg.set(r.rival, o); }
+    o.listings   += r.listings;
+    if (r.vendio) o.vendidos++;
+    o.expirados  += r.expirados;
   }
 
   // Solo rivales que tienen partido asociado y al menos 1 listing
@@ -1959,10 +1957,10 @@ function renderMS() {
   const fp = state.filters.msPartido, fe = state.filters.msEstatus;
   let ingTotal = 0, ingCount = 0;
   for (const r of (state.data.reventas || [])) {
-    if (r.estatus !== "vendido") continue;
+    if (!r.vendio) continue;
     if (typeof r.precio !== "number") continue;
     if (fp && r.rival !== fp) continue;
-    if (fe && r.estatus !== fe) continue;
+    if (fe === "expirado") continue;
     const a = abonados[r.a];
     if (!a || !inScope(a, "main")) continue;
     ingTotal += r.precio; ingCount++;

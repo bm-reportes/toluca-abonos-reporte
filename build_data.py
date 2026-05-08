@@ -31,7 +31,8 @@ SOURCE_DIR = Path("/Users/javierolea/Desktop/Toluca")
 OUTPUT     = Path("/Users/javierolea/Desktop/reporte-abonados/data.json")
 
 ORDERS_FILE = "Ordenes abonos.xlsx"
-MS_SUBDIR   = "Mercado Secundario"
+MS_SUBDIR            = "Mercado Secundario"
+MS_DETALLADO_SUBDIR  = "Orden Detallada"
 
 # Todos los abonos son anuales esta temporada.
 # Vigencia: desde la fecha de compra (no eres elegible para partidos previos a
@@ -247,58 +248,135 @@ def build_partidos_y_accesos(abonados, abonado_idx):
     return partidos, new_accesos, excluidos
 
 
+def build_orden_barcode_map(ms_dir):
+    """Lee archivos de Orden Detallada y devuelve {orden_venta: codigo_barras_restringido}.
+    Cubre todas las ventas completadas para cruzar con los listings del formato corto.
+    """
+    detallado_dir = ms_dir / MS_DETALLADO_SUBDIR
+    if not detallado_dir.is_dir():
+        return {}
+    result = {}
+    for f in sorted(detallado_dir.iterdir()):
+        if not f.is_file() or f.suffix.lower() != ".xlsx":
+            continue
+        for d in read_sheet(f):
+            ov = d.get("ORDEN VENTA")
+            cb = d.get("CÓDIGO DE BARRAS RESTRINGIDO")
+            if ov and cb and str(ov).startswith("RV-"):
+                result[str(ov)] = str(cb)
+    print(f"  Orden Detallada: {len(result)} ventas con barcode")
+    return result
+
+
 def build_reventas(abonados):
-    """Lee los archivos de Mercado Secundario y liga cada listing a un abonado
-    por (zona, seccion, asiento). Cada archivo = un partido.
-    Devuelve lista de reventas: {a: idx_abonado, rival, fecha_listado, estatus, precio}.
+    """Lee los archivos de Mercado Secundario (formato corto) y cruza con los
+    archivos de Orden Detallada para identificar abonados por CÓDIGO DE BARRAS.
+
+    Matching:
+      1. ORDEN DE VENTA (listing) → Orden Detallada → CÓDIGO DE BARRAS RESTRINGIDO
+         → barcode del abonado. Funciona solo para ventas completadas.
+      2. Fallback: (ZONA, SECCION, ASIENTO) para listings sin match en Orden Detallada.
+
+    Salida: un registro por (abonado × rival), con:
+      vendio      – True si al menos uno de sus listings vendió para ese partido.
+      listings    – total de listings colocados.
+      expirados   – listings que expiraron sin vender.
+      fecha       – fecha del primer listing.
+      ultimo      – fecha del último listing.
+      precio      – precio de venta si vendio=True, None si no.
+      precio_listado – precio de oferta del primer listing (cualquier estatus).
     """
     ms_dir = SOURCE_DIR / MS_SUBDIR
     if not ms_dir.is_dir():
         return []
 
-    # Índice (zona, seccion, asiento) -> idx de abonado
+    # Índice barcode -> idx (matching primario via Orden Detallada)
+    barcode_idx = {a["barcode"]: i for i, a in enumerate(abonados) if a.get("barcode")}
+    # Índice (zona, seccion, asiento) -> idx (fallback)
     idx_seat = {}
     for i, a in enumerate(abonados):
         idx_seat[(a.get("zona",""), a.get("seccion",""), a.get("asiento",""))] = i
 
-    reventas = []
+    orden_barcode = build_orden_barcode_map(ms_dir)
+
+    agg = {}   # (idx, rival) -> entry
     no_match = 0
+
     for f in sorted(ms_dir.iterdir()):
-        if not f.is_file() or f.suffix.lower() != ".xlsx":
+        if not f.is_file() or f.suffix.lower() != ".xlsx" or f.name.startswith("~"):
+            continue
+        if f.name == ORDERS_FILE:
             continue
         rival = f.stem
         total_f = match_f = 0
+
         for d in read_sheet(f):
             estatus = d.get("ESTATUS")
-            if estatus in (None, "ESTATUS"):  # skip blanks/header-dup
+            if estatus in (None, "ESTATUS"):
                 continue
             total_f += 1
-            k = (d.get("ZONA") or "", d.get("SECCION") or "", d.get("ASIENTO") or "")
-            idx = idx_seat.get(k)
+
+            # 1. Matching por barcode via Orden Detallada
+            orden_venta = str(d.get("ORDEN DE VENTA") or "")
+            barcode = orden_barcode.get(orden_venta)
+            idx = barcode_idx.get(barcode) if barcode else None
+
+            # 2. Fallback: matching por asiento
+            if idx is None:
+                k = (d.get("ZONA") or "", d.get("SECCION") or "", d.get("ASIENTO") or "")
+                idx = idx_seat.get(k)
+
             if idx is None:
                 no_match += 1
                 continue
+
             match_f += 1
+            es_vendido  = str(estatus).upper().startswith("VEND")
+            es_expirado = str(estatus).upper().startswith("EXP")
+
             listado = d.get("LISTADO")
             try:
                 fecha = datetime.fromtimestamp(int(listado)).strftime("%Y-%m-%d") if listado else None
             except (ValueError, TypeError, OSError):
                 fecha = None
+
             precio = d.get("PRECIO DE VENTA")
-            try: precio = int(precio) if precio not in (None, "", "-") else None
-            except (ValueError, TypeError): precio = None
-            reventas.append({
-                "a": idx,
-                "rival": rival,
-                "fecha": fecha,
-                "estatus": "vendido" if str(estatus).upper().startswith("VEND")
-                           else "expirado" if str(estatus).upper().startswith("EXP")
-                           else "disponible" if str(estatus).lower().startswith("disp")
-                           else str(estatus).lower(),
-                "precio": precio,
-            })
+            try:
+                precio = int(precio) if precio not in (None, "", "-") else None
+            except (ValueError, TypeError):
+                precio = None
+
+            key = (idx, rival)
+            if key not in agg:
+                agg[key] = {
+                    "a":              idx,
+                    "rival":          rival,
+                    "listings":       0,
+                    "expirados":      0,
+                    "vendio":         False,
+                    "fecha":          None,
+                    "ultimo":         None,
+                    "precio":         None,
+                    "precio_listado": None,
+                }
+            e = agg[key]
+            e["listings"] += 1
+            if es_vendido:
+                e["vendio"] = True
+                if precio is not None:
+                    e["precio"] = precio
+            elif es_expirado:
+                e["expirados"] += 1
+            if fecha:
+                if not e["fecha"]  or fecha < e["fecha"]:  e["fecha"]  = fecha
+                if not e["ultimo"] or fecha > e["ultimo"]:  e["ultimo"] = fecha
+            if e["precio_listado"] is None and precio is not None:
+                e["precio_listado"] = precio
+
         print(f"  MS {rival:20s} listings={total_f:>5}  ligables={match_f}")
-    print(f"  Reventas ligadas: {len(reventas)}  sin match: {no_match}")
+
+    reventas = list(agg.values())
+    print(f"  Reventas: {len(reventas)} pares abonado×partido  sin match: {no_match}")
     return reventas
 
 
