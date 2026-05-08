@@ -166,7 +166,7 @@ def build_partidos_y_accesos(abonados, abonado_idx):
     ASIENTOS_GENERICOS = {"General", "GENERAL", "general"}
 
     for f in sorted(SOURCE_DIR.iterdir()):
-        if not f.is_file() or f.suffix.lower() != ".xlsx":
+        if not f.is_file() or f.suffix.lower() != ".xlsx" or f.name.startswith("~"):
             continue
         if f.name == ORDERS_FILE:
             continue
@@ -257,7 +257,7 @@ def build_orden_barcode_map(ms_dir):
         return {}
     result = {}
     for f in sorted(detallado_dir.iterdir()):
-        if not f.is_file() or f.suffix.lower() != ".xlsx":
+        if not f.is_file() or f.suffix.lower() != ".xlsx" or f.name.startswith("~"):
             continue
         for d in read_sheet(f):
             ov = d.get("ORDEN VENTA")
