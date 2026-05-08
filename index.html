@@ -1398,8 +1398,9 @@ function reventasByPartido(scope) {
     const pid = ridToPid.get(r.rival);
     if (!pid) continue;
     out.get(pid).set(r.a, {
-      vendido:  r.vendio,
-      expirado: !r.vendio && r.expirados > 0,
+      vendido:   r.vendio,
+      vendidos:  r.vendidos || 0,
+      expirado:  !r.vendio && r.expirados > 0,
       disponible: false,
     });
   }
@@ -1439,10 +1440,10 @@ function computePartidoStats(scope) {
     }
     const ausencias    = elegibles - asistencias;
     const vaciosReales = listoSinVender + vacioSinListar;
-    // reventa = todos los que vendieron en MS (comprador asistió o no)
+    // reventa = total de boletos vendidos en MS (sum de vendidos, no abonados únicos)
     let reventaTotal = 0;
     for (const [, r] of partidoReventa) {
-      if (r.vendido) reventaTotal++;
+      reventaTotal += r.vendidos || 0;
     }
 
     return {
