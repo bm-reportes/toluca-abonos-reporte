@@ -296,7 +296,7 @@
   /* Layout específico del Resumen: hero ancho + KPI apoyo */
   .kpi-resumen {
     display: grid;
-    grid-template-columns: 2fr 1fr;
+    grid-template-columns: 2fr 1fr 1fr;
     gap: 12px;
   }
   @media (max-width: 720px) {
@@ -642,6 +642,14 @@
         <div class="value" id="kpi-anuales">—</div>
         <div class="sub" id="kpi-partidos-sub">—</div>
       </div>
+      <div class="kpi">
+        <div class="label">
+          Pusieron en venta
+          <span class="info-icon" title="% de abonados únicos que listaron al menos un boleto en mercado secundario durante el periodo.">i</span>
+        </div>
+        <div class="value" id="kpi-ms-pct-listaron">—</div>
+        <div class="sub" id="kpi-ms-listaron-sub">—</div>
+      </div>
     </div>
 
     <div style="margin-top:24px; margin-bottom:8px">
@@ -792,12 +800,11 @@
     </div>
 
     <div class="kpi-grid" style="margin-bottom:20px">
+      <div class="kpi"><div class="label">Intentaron vender <span class="info-icon" title="Abonados únicos que pusieron al menos un boleto en MS (sin importar cuántas veces).">i</span></div><div class="value" id="kpi-ms-vendedores">—</div></div>
+      <div class="kpi"><div class="label">Tasa de éxito <span class="info-icon" title="% de abonados que intentaron vender y lograron vender al menos uno.">i</span></div><div class="value" id="kpi-ms-tasa-exito">—</div><div class="sub" id="kpi-ms-tasa-sub">—</div></div>
       <div class="kpi"><div class="label">Total de listings</div><div class="value" id="kpi-ms-total">—</div></div>
-      <div class="kpi"><div class="label">Vendidos</div><div class="value" id="kpi-ms-vendidos">—</div></div>
       <div class="kpi"><div class="label">Ingresos totales</div><div class="value" id="kpi-ms-ingresos">—</div></div>
       <div class="kpi"><div class="label">Precio promedio</div><div class="value" id="kpi-ms-precio-prom">—</div></div>
-      <div class="kpi"><div class="label">Expirados</div><div class="value" id="kpi-ms-expirados">—</div></div>
-      <div class="kpi"><div class="label">Abonados que revenden</div><div class="value" id="kpi-ms-vendedores">—</div></div>
     </div>
 
     <div class="card" style="padding:18px 20px">
@@ -1960,12 +1967,16 @@ function renderMS() {
   }
   const money = n => "$" + Math.round(n).toLocaleString("es-MX");
 
-  $("#kpi-ms-total").textContent        = totalListings.toLocaleString("es-MX");
-  $("#kpi-ms-vendidos").textContent     = totalVend.toLocaleString("es-MX");
-  $("#kpi-ms-ingresos").textContent     = ingTotal ? money(ingTotal) : "$0";
-  $("#kpi-ms-precio-prom").textContent  = ingCount ? money(ingTotal / ingCount) : "—";
-  $("#kpi-ms-expirados").textContent    = totalExp.toLocaleString("es-MX");
-  $("#kpi-ms-vendedores").textContent   = rows.length.toLocaleString("es-MX");
+  const totalIntentaron  = rows.length;
+  const totalVendieron   = rows.filter(o => o.vendidos > 0).length;
+  const tasaExito        = totalIntentaron > 0 ? totalVendieron / totalIntentaron : 0;
+
+  $("#kpi-ms-vendedores").textContent  = totalIntentaron.toLocaleString("es-MX");
+  $("#kpi-ms-tasa-exito").textContent  = fmtPct(tasaExito);
+  $("#kpi-ms-tasa-sub").textContent    = `${totalVendieron.toLocaleString("es-MX")} vendieron · ${(totalIntentaron - totalVendieron).toLocaleString("es-MX")} no`;
+  $("#kpi-ms-total").textContent       = totalListings.toLocaleString("es-MX");
+  $("#kpi-ms-ingresos").textContent    = ingTotal ? money(ingTotal) : "$0";
+  $("#kpi-ms-precio-prom").textContent = ingCount ? money(ingTotal / ingCount) : "—";
 
   // Orden (default: total desc)
   const sorted = sortRows(rows, state.sortMS);
@@ -2020,6 +2031,16 @@ function renderKPIs(stats) {
   // Abonados activos
   $("#kpi-anuales").textContent      = abonados.length.toLocaleString("es-MX");
   $("#kpi-partidos-sub").textContent = `${stats.length} partidos en el periodo`;
+
+  // % que pusieron en venta al menos una vez
+  const abonadosConReventa = new Set(
+    (state.data.reventas || [])
+      .filter(r => { const a = state.data.abonados[r.a]; return a && !a.esFull; })
+      .map(r => r.a)
+  );
+  const pctListaron = abonados.length > 0 ? abonadosConReventa.size / abonados.length : 0;
+  $("#kpi-ms-pct-listaron").textContent = fmtPct(pctListaron);
+  $("#kpi-ms-listaron-sub").textContent = `${abonadosConReventa.size.toLocaleString("es-MX")} abonados`;
 }
 
 function renderTablaPartidos(stats) {
