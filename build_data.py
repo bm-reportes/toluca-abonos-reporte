@@ -329,6 +329,12 @@ def build_reventas(abonados):
             barcode = orden_barcode.get(orden_venta)
             idx = barcode_idx.get(barcode) if barcode else None
 
+            # Validar que el asiento coincide (órdenes en bloque tienen el mismo
+            # ORDEN DE VENTA para varios asientos distintos; sin esta validación
+            # todos los asientos se colapsan al mismo abonado)
+            if idx is not None and abonados[idx].get("asiento", "") != str(d.get("ASIENTO") or ""):
+                idx = None
+
             # 2. Fallback: matching por asiento
             if idx is None:
                 k = (d.get("ZONA") or "", d.get("SECCION") or "", d.get("ASIENTO") or "")
