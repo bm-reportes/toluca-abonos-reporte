@@ -2025,7 +2025,6 @@ function renderMS() {
   $("#kpi-ms-tasa-sub").textContent    = `${totalVendieron.toLocaleString("es-MX")} vendieron · ${(totalIntentaron - totalVendieron).toLocaleString("es-MX")} no`;
   $("#kpi-ms-total").textContent       = totalListings.toLocaleString("es-MX");
   $("#kpi-ms-ingresos").textContent    = ingTotal ? money(ingTotal) : "$0";
-  $("#kpi-ms-precio-prom").textContent = ingCount ? money(ingTotal / ingCount) : "—";
 
   // Orden (default: total desc)
   const sorted = sortRows(rows, state.sortMS);
