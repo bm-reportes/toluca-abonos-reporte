@@ -1867,7 +1867,7 @@ function renderMSAbonadosChart() {
 
   const abonados = state.data.abonados;
   const fe = state.filters.msEstatus;
-  const byRival     = new Map(); // rival -> { vendieron, noVendieron }
+  const byRival     = new Map(); // rival -> { vendieronSet: Set, noVendieronSet: Set }
   const detailByRival = new Map(); // rival -> [ detalle por abonado ]
 
   for (const r of (state.data.reventas || [])) {
@@ -1876,9 +1876,14 @@ function renderMSAbonadosChart() {
     if (fe === "vendido"  && !r.vendio) continue;
     if (fe === "expirado" &&  r.vendio) continue;
 
-    const cur = byRival.get(r.rival) || { vendieron: 0, noVendieron: 0 };
-    if (r.vendio) cur.vendieron++; else cur.noVendieron++;
-    byRival.set(r.rival, cur);
+    if (!byRival.has(r.rival)) byRival.set(r.rival, { vendieronSet: new Set(), noVendieronSet: new Set() });
+    const cur = byRival.get(r.rival);
+    if (r.vendio) {
+      cur.vendieronSet.add(r.a);
+      cur.noVendieronSet.delete(r.a);
+    } else if (!cur.vendieronSet.has(r.a)) {
+      cur.noVendieronSet.add(r.a);
+    }
 
     if (!detailByRival.has(r.rival)) detailByRival.set(r.rival, []);
     detailByRival.get(r.rival).push({
@@ -1899,7 +1904,11 @@ function renderMSAbonadosChart() {
   }
 
   const rows = Array.from(byRival.entries())
-    .map(([rival, v]) => ({ rival, ...v, total: v.vendieron + v.noVendieron }))
+    .map(([rival, v]) => {
+      const vendieron   = v.vendieronSet.size;
+      const noVendieron = v.noVendieronSet.size;
+      return { rival, vendieron, noVendieron, total: vendieron + noVendieron };
+    })
     .sort((a, b) => b.total - a.total);
 
   const scale = rows.reduce((m, r) => Math.max(m, r.total), 0) || 1;
