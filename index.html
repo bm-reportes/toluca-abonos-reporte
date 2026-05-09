@@ -795,11 +795,16 @@
       <div class="kpi"><div class="label">Ingresos totales</div><div class="value" id="kpi-ms-ingresos">—</div></div>
     </div>
 
+    <div class="card" style="padding:18px 20px; margin-bottom:16px">
+      <h3 style="margin:0 0 14px; font-size:14px; font-weight:600">Resumen: abonados en Mercado Secundario</h3>
+      <div id="ms-exito-resumen"></div>
+    </div>
+
     <div class="card" style="padding:18px 20px">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:8px">
         <div>
           <h3 style="margin:0; font-size:14px; font-weight:600">Abonos únicos por partido</h3>
-          <div style="font-size:12px; color:var(--text-muted); margin-top:2px">Cuántos abonados únicos intentaron vender y cuántos lo lograron · total y % de éxito al final</div>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:2px">Cuántos abonados únicos intentaron vender y cuántos lo lograron · click para ver detalle</div>
         </div>
         <div class="inv-legend">
           <span><span class="dot sold"></span>Vendieron</span>
@@ -1861,6 +1866,73 @@ function renderMSHeatmap() {
   grid.innerHTML = html;
 }
 
+function renderMSExitoResumen() {
+  const el = document.getElementById("ms-exito-resumen");
+  if (!el) return;
+
+  const abonados = state.data.abonados;
+  const fp = state.filters.msPartido;
+  const fe = state.filters.msEstatus;
+
+  const vendieronSet    = new Set();
+  const noVendieronSet  = new Set();
+
+  for (const r of (state.data.reventas || [])) {
+    const a = abonados[r.a];
+    if (!a || !inScope(a, "main")) continue;
+    if (fp && r.rival !== fp) continue;
+    if (fe === "vendido"  && !r.vendio) continue;
+    if (fe === "expirado" &&  r.vendio) continue;
+
+    if (r.vendio) {
+      vendieronSet.add(r.a);
+      noVendieronSet.delete(r.a);
+    } else if (!vendieronSet.has(r.a)) {
+      noVendieronSet.add(r.a);
+    }
+  }
+
+  const vendieron   = vendieronSet.size;
+  const noVendieron = noVendieronSet.size;
+  const total       = vendieron + noVendieron;
+  const tasaExito   = total > 0 ? vendieron / total : 0;
+
+  const vendW = total > 0 ? (vendieron   / total) * 100 : 0;
+  const noW   = total > 0 ? (noVendieron / total) * 100 : 0;
+
+  const exitoColor = semaforoExito(tasaExito);
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:32px;flex-wrap:wrap">
+      <div style="text-align:center;min-width:90px">
+        <div style="font-size:36px;font-weight:800;line-height:1">${total.toLocaleString("es-MX")}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">abonados únicos<br>pusieron en venta</div>
+      </div>
+      <div style="flex:1;min-width:200px">
+        <div style="display:flex;height:28px;border-radius:6px;overflow:hidden;margin-bottom:10px">
+          ${vendW > 0 ? `<div style="width:${vendW.toFixed(1)}%;background:#22c55e;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px">${vendW >= 8 ? vendieron.toLocaleString("es-MX") : ""}</div>` : ""}
+          ${noW  > 0 ? `<div style="width:${noW.toFixed(1)}%;background:#ef4444;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;white-space:nowrap;padding:0 6px">${noW  >= 8 ? noVendieron.toLocaleString("es-MX") : ""}</div>` : ""}
+        </div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="width:10px;height:10px;border-radius:50%;background:#22c55e;display:inline-block"></span>
+            <span style="font-size:13px"><strong>${vendieron.toLocaleString("es-MX")}</strong> vendieron</span>
+            <span style="font-size:12px;color:var(--text-muted)">${fmtPct(tasaExito)}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block"></span>
+            <span style="font-size:13px"><strong>${noVendieron.toLocaleString("es-MX")}</strong> no vendieron</span>
+            <span style="font-size:12px;color:var(--text-muted)">${fmtPct(1 - tasaExito)}</span>
+          </div>
+        </div>
+      </div>
+      <div style="text-align:center;min-width:90px">
+        <div style="font-size:36px;font-weight:800;line-height:1;color:${exitoColor}">${(tasaExito * 100).toFixed(0)}%</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">tasa de éxito</div>
+      </div>
+    </div>`;
+}
+
 function renderMSAbonadosChart() {
   const el = document.getElementById("abonados-list");
   if (!el) return;
@@ -1994,6 +2066,7 @@ function buildMSAbonadoDetail(rows) {
 function renderMS() {
   if (!$("#tabla-ms")) return;
   renderMSInvList();
+  renderMSExitoResumen();
   renderMSAbonadosChart();
   renderMSIngresos();
 
