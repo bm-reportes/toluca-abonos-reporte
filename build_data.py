@@ -374,7 +374,7 @@ def build_reventas(abonados):
                 e["vendio"]   = True
                 e["vendidos"] += 1
                 if precio is not None:
-                    e["precio"] = precio
+                    e["precio"] = (e["precio"] or 0) + precio
             elif es_expirado:
                 e["expirados"] += 1
             if fecha:
@@ -429,7 +429,7 @@ def build_reventas(abonados):
                 e["vendio"]    = True
                 e["vendidos"] += 1
                 if precio is not None:
-                    e["precio"] = precio
+                    e["precio"] = (e["precio"] or 0) + precio
                     if e["precio_listado"] is None:
                         e["precio_listado"] = precio
                 if fecha:
