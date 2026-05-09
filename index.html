@@ -841,8 +841,8 @@
         </div>
         <div class="pill-tabs" id="heatmap-sort-tabs">
           <button data-sort="cron" class="active">Cronológico</button>
-          <button data-sort="listings">Más listings</button>
-          <button data-sort="rechazo">Más % rechazo</button>
+          <button data-sort="total">Más abonados</button>
+          <button data-sort="exito">Más % éxito</button>
         </div>
       </div>
       <div class="heatmap-table" id="heatmap-table"></div>
@@ -850,7 +850,7 @@
         <span>Menos</span>
         <div class="gradient"></div>
         <span>Más</span>
-        <span style="margin-left:auto">Verde = vendidos · Rojo = listings/expirados/rechazo</span>
+        <span style="margin-left:auto">Verde = vendieron · Rojo = no vendieron · % éxito = vendieron ÷ pusieron en venta</span>
       </div>
     </div>
   </section>
@@ -1792,8 +1792,7 @@ function renderMSIngresos() {
   });
 }
 
-// Heatmap por partido: listings totales, vendidos, expirados y % rechazo.
-// Cada celda se colorea por intensidad relativa al máximo de su columna.
+// Heatmap por partido: abonados únicos que pusieron en venta, vendieron y no vendieron.
 function renderMSHeatmap() {
   const grid = document.getElementById("heatmap-table");
   if (!grid) return;
@@ -1803,65 +1802,66 @@ function renderMSHeatmap() {
   const partidoByRival = new Map();
   for (const p of partidos) partidoByRival.set(p.rival, p);
 
-  // Agregado por rival (mismo scope que el resto de MS: "main", excluye Digital FULL)
+  // Conteo por rival usando Sets para garantizar unicidad
   const agg = new Map();
   for (const r of (state.data.reventas || [])) {
     const a = abonados[r.a];
     if (!a || !inScope(a, "main")) continue;
-    let o = agg.get(r.rival);
-    if (!o) { o = { rival: r.rival, listings: 0, vendidos: 0, expirados: 0 }; agg.set(r.rival, o); }
-    o.listings   += r.listings;
-    o.vendidos   += r.vendidos || 0;
-    o.expirados  += r.expirados;
+    if (!agg.has(r.rival)) agg.set(r.rival, { rival: r.rival, vendieronSet: new Set(), noVendieronSet: new Set() });
+    const o = agg.get(r.rival);
+    if (r.vendio) {
+      o.vendieronSet.add(r.a);
+      o.noVendieronSet.delete(r.a);
+    } else if (!o.vendieronSet.has(r.a)) {
+      o.noVendieronSet.add(r.a);
+    }
   }
 
-  // Solo rivales que tienen partido asociado y al menos 1 listing
   const rows = Array.from(agg.values())
-    .filter(o => partidoByRival.has(o.rival) && o.listings > 0)
-    .map(o => ({
-      ...o,
-      fecha: partidoByRival.get(o.rival)?.fecha || "",
-      pctRechazo: o.listings > 0 ? o.expirados / o.listings : 0,
-    }));
+    .filter(o => partidoByRival.has(o.rival))
+    .map(o => {
+      const vendieron   = o.vendieronSet.size;
+      const noVendieron = o.noVendieronSet.size;
+      const total       = vendieron + noVendieron;
+      return {
+        rival: o.rival,
+        fecha: partidoByRival.get(o.rival)?.fecha || "",
+        total,
+        vendieron,
+        noVendieron,
+        pctExito: total > 0 ? vendieron / total : 0,
+      };
+    })
+    .filter(o => o.total > 0);
 
-  // Orden
   const sortMode = state.filters.heatmapSort || "cron";
-  if (sortMode === "listings")     rows.sort((a,b) => b.listings - a.listings);
-  else if (sortMode === "rechazo") rows.sort((a,b) => b.pctRechazo - a.pctRechazo);
-  else rows.sort((a,b) => a.fecha.localeCompare(b.fecha));
+  if (sortMode === "total")       rows.sort((a,b) => b.total - a.total);
+  else if (sortMode === "exito")  rows.sort((a,b) => b.pctExito - a.pctExito);
+  else                            rows.sort((a,b) => a.fecha.localeCompare(b.fecha));
 
-  // Máximos por columna (para intensidad)
-  const maxL = rows.reduce((m,r) => Math.max(m, r.listings), 0) || 1;
-  const maxV = rows.reduce((m,r) => Math.max(m, r.vendidos), 0) || 1;
-  const maxE = rows.reduce((m,r) => Math.max(m, r.expirados), 0) || 1;
-  const maxR = rows.reduce((m,r) => Math.max(m, r.pctRechazo), 0) || 1;
+  const maxT = rows.reduce((m,r) => Math.max(m, r.total),       0) || 1;
+  const maxV = rows.reduce((m,r) => Math.max(m, r.vendieron),   0) || 1;
+  const maxN = rows.reduce((m,r) => Math.max(m, r.noVendieron), 0) || 1;
 
-  // Helpers de color: intensidad 0..1 -> rgba
   const red   = t => `rgba(239, 68, 68, ${(0.15 + t * 0.80).toFixed(3)})`;
   const green = t => `rgba(52, 211, 153, ${(0.15 + t * 0.80).toFixed(3)})`;
+  const blue  = t => `rgba(139, 92, 246, ${(0.15 + t * 0.80).toFixed(3)})`;
 
   let html = ""
     + `<div class="heatmap-cell header partido">Partido</div>`
-    + `<div class="heatmap-cell header">Listings</div>`
-    + `<div class="heatmap-cell header">Vendidos</div>`
-    + `<div class="heatmap-cell header">Expirados</div>`
-    + `<div class="heatmap-cell header">% Rechazo</div>`;
+    + `<div class="heatmap-cell header">Pusieron en venta</div>`
+    + `<div class="heatmap-cell header">Vendieron</div>`
+    + `<div class="heatmap-cell header">No vendieron</div>`
+    + `<div class="heatmap-cell header">% Éxito</div>`;
 
   for (const r of rows) {
-    const tL = r.listings  / maxL;
-    const tV = r.vendidos  / maxV;
-    const tE = r.expirados / maxE;
-    const tR = r.pctRechazo / maxR;
-    const cellL = r.listings  > 0 ? `style="background:${red(tL)}"`   : 'class="empty"';
-    const cellV = r.vendidos  > 0 ? `style="background:${green(tV)}"` : 'class="empty"';
-    const cellE = r.expirados > 0 ? `style="background:${red(tE)}"`   : 'class="empty"';
-    const cellR = r.pctRechazo > 0 ? `style="background:${red(tR)}"`  : 'class="empty"';
+    const exitoColor = r.pctExito >= 0.70 ? green(r.pctExito) : r.pctExito >= 0.50 ? `rgba(245,158,11,0.7)` : red(r.pctExito);
     html += ""
       + `<div class="heatmap-cell partido" title="${r.fecha}">${escapeHTML(r.rival)}</div>`
-      + `<div class="heatmap-cell value" ${cellL}>${r.listings.toLocaleString("es-MX")}</div>`
-      + `<div class="heatmap-cell value" ${cellV}>${r.vendidos.toLocaleString("es-MX")}</div>`
-      + `<div class="heatmap-cell value" ${cellE}>${r.expirados.toLocaleString("es-MX")}</div>`
-      + `<div class="heatmap-cell value" ${cellR}>${(r.pctRechazo * 100).toFixed(0)}%</div>`;
+      + `<div class="heatmap-cell value" style="background:${blue(r.total / maxT)}">${r.total.toLocaleString("es-MX")}</div>`
+      + `<div class="heatmap-cell value" style="background:${green(r.vendieron / maxV)}">${r.vendieron.toLocaleString("es-MX")}</div>`
+      + `<div class="heatmap-cell value" ${r.noVendieron > 0 ? `style="background:${red(r.noVendieron / maxN)}"` : 'class="empty"'}>${r.noVendieron.toLocaleString("es-MX")}</div>`
+      + `<div class="heatmap-cell value" style="background:${exitoColor}">${(r.pctExito * 100).toFixed(0)}%</div>`;
   }
   grid.innerHTML = html;
 }
