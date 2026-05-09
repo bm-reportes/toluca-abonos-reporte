@@ -790,8 +790,7 @@
 
     <div class="kpi-grid" style="margin-bottom:20px">
       <div class="kpi"><div class="label">Intentaron vender <span class="info-icon" title="Abonados únicos que pusieron al menos un boleto en MS (sin importar cuántas veces).">i</span></div><div class="value" id="kpi-ms-vendedores">—</div></div>
-      <div class="kpi"><div class="label">Tasa de éxito <span class="info-icon" title="% de abonados que intentaron vender y lograron vender al menos uno.">i</span></div><div class="value" id="kpi-ms-tasa-exito">—</div><div class="sub" id="kpi-ms-tasa-sub">—</div></div>
-      <div class="kpi"><div class="label">Boletos vendidos <span class="info-icon" title="Total de boletos individuales vendidos en MS (un abonado puede vender más de uno).">i</span></div><div class="value" id="kpi-ms-boletos-vendidos">—</div></div>
+<div class="kpi"><div class="label">Boletos vendidos <span class="info-icon" title="Total de boletos individuales vendidos en MS (un abonado puede vender más de uno).">i</span></div><div class="value" id="kpi-ms-boletos-vendidos">—</div></div>
       <div class="kpi"><div class="label">Total de listings</div><div class="value" id="kpi-ms-total">—</div></div>
       <div class="kpi"><div class="label">Ingresos totales</div><div class="value" id="kpi-ms-ingresos">—</div></div>
     </div>
@@ -2096,8 +2095,7 @@ function renderMS() {
 
   $("#kpi-ms-boletos-vendidos").textContent = totalBoletosVendidos.toLocaleString("es-MX");
   $("#kpi-ms-vendedores").textContent  = totalIntentaron.toLocaleString("es-MX");
-  $("#kpi-ms-tasa-exito").textContent  = fmtPct(tasaExito);
-  $("#kpi-ms-tasa-sub").textContent    = `${totalVendieron.toLocaleString("es-MX")} vendieron · ${(totalIntentaron - totalVendieron).toLocaleString("es-MX")} no`;
+
   $("#kpi-ms-total").textContent       = totalListings.toLocaleString("es-MX");
   $("#kpi-ms-ingresos").textContent    = ingTotal ? money(ingTotal) : "$0";
 
